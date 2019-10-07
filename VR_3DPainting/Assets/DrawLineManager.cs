@@ -31,7 +31,7 @@ IPointerHoverHandler
     private GameObject m_RightController;
     private GameObject m_LeftController;
 
-    private LineRenderer currLine;
+    private GraphicsLineRenderer currLine;
     private int numClicks = 0;
     public GameObject trackedObj;
     public Material lMat;
@@ -59,9 +59,9 @@ IPointerHoverHandler
                 GameObject go = new GameObject();
                 go.AddComponent<MeshFilter>();
                 go.AddComponent<MeshRenderer>();
-                currLine = go.AddComponent<LineRenderer>();
-                currLine.SetWidth(.1f, .1f);
-                currLine.material = lMat;
+                currLine = go.AddComponent<GraphicsLineRenderer>();
+                currLine.SetWidth(.05f);
+                currLine.lmat = lMat;
 
                 //currLine.SetWidth(.1f);
                 numClicks = 0;
@@ -70,9 +70,9 @@ IPointerHoverHandler
             else if (WaveVR_Controller.Input(DomFocusControllerType).GetPress(WVR_InputId.WVR_InputId_Alias1_Touchpad) ||
                 WaveVR_Controller.Input(DomFocusControllerType).GetPress(WVR_InputId.WVR_InputId_Alias1_Trigger))
             {
-                currLine.SetVertexCount(numClicks + 1);
-                currLine.SetPosition(numClicks, WaveVR_Controller.Input(DomFocusControllerType).transform.pos);
-            
+            //currLine.SetVertexCount(numClicks + 1);
+            //currLine.SetPosition(numClicks, WaveVR_Controller.Input(DomFocusControllerType).transform.pos);
+                currLine.AddPoint(WaveVR_Controller.Input(DomFocusControllerType).transform.pos);
                 numClicks++;
 
                 trackedObj.GetComponent<MeshRenderer>().material.SetColor("_Color", Color.yellow);
