@@ -59,7 +59,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1328440791}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -5.5, y: 2.6, z: 4}
+  m_LocalPosition: {x: -2.88, y: -0.35, z: 3.05}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 1039849161}
@@ -976,9 +976,12 @@ MonoBehaviour:
   m_GameObject: {fileID: 1328440791}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a2b5f4ca71bfe453f876727e25dc93fb, type: 3}
+  m_Script: {fileID: 11500000, guid: d918cdef9b9ad43eaa9d39150cbf00f5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  isControllerFocus_R: 0
+  isControllerFocus_L: 0
+  SceneName: VR_3DPainting
 --- !u!4 &1329518399 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 4575283832211176, guid: c6c23447d97cdec47ae26a8552bf2607,
