@@ -14,26 +14,20 @@ public class DrawLineManager : MonoBehaviour
     private WaveVR_PermissionManager pmInstance = null;
 
     private GraphicsLineRenderer currLine;
-    private int numClicks = 0;
+    private int numClicks;
     public GameObject trackedObj;
     public Material lMat;
+    float width = .1f;
+
+
     void Start()
     {
-
         trackedObj.GetComponent<MeshRenderer>().material.SetColor("_Color", Color.red);
-
-        //originalPos = transform.position;
-        //pmInstance = WaveVR_PermissionManager.instance;
-        //if (pmInstance.isInitialized())
-        //{
-        //    pmInstance.requestUsbPermission(requestUsbDoneCallback);
-        //}
+        OnEnable();
     }
 
     void Update()
     {
-            //trackedObj.GetComponent<MeshRenderer>().material.SetColor("_Color", Color.black);
-
         if (WaveVR_Controller.Input(DomFocusControllerType).GetPressDown(WVR_InputId.WVR_InputId_Alias1_Trigger))
         {
             GameObject go = new GameObject();
@@ -43,7 +37,7 @@ public class DrawLineManager : MonoBehaviour
 
             currLine.lmat = new Material(lMat);
             //currLine.lmat = lMat;
-            currLine.SetWidth(.06f);
+            currLine.SetWidth(width);
 
             numClicks = 0;
             //WaveVR_Controller.Input(DomFocusControllerType).TriggerHapticPulse();
@@ -77,5 +71,40 @@ public class DrawLineManager : MonoBehaviour
         //{
         //    trackedObj.GetComponent<MeshRenderer>().material.SetColor("_Color", Color.red);
         //}
+    }
+    void OnEvent(params object[] args)
+    {
+        var _event = (WVR_EventType)args[0];
+        Log.d("Event_Test", "OnEvent() _event = " + _event);
+
+        switch (_event)
+        {
+            case WVR_EventType.WVR_EventType_LeftToRightSwipe:
+                //transform.Rotate(0, 180 * (10 * Time.deltaTime), 0);
+                width += 0.02f;
+                break;
+            case WVR_EventType.WVR_EventType_RightToLeftSwipe:
+                width -= 0.02f;
+                //transform.Rotate(0, -180 * (10 * Time.deltaTime), 0);
+                break;
+            case WVR_EventType.WVR_EventType_DownToUpSwipe:
+                width += 0.02f;
+                //transform.Rotate(0, 0, 180 * (10 * Time.deltaTime));
+                break;
+            case WVR_EventType.WVR_EventType_UpToDownSwipe:
+                width -= 0.02f;
+                //transform.Rotate(0, 0, -180 * (10 * Time.deltaTime));
+                break;
+        }
+    }
+
+    void OnEnable()
+    {
+        WaveVR_Utils.Event.Listen(WaveVR_Utils.Event.SWIPE_EVENT, OnEvent);
+    }
+
+    void OnDisable()
+    {
+        WaveVR_Utils.Event.Remove(WaveVR_Utils.Event.SWIPE_EVENT, OnEvent);
     }
 }

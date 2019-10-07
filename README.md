@@ -24,8 +24,11 @@ This is a sample Scene build from [Hello VR](https://hub.vive.com/storage/app/do
 
 Simply Build and Run after connecting Focus to Mac
 
-## Drawing
+## Drawing Lines
 Be able to draw continuous strokes in 3D using a handheld controller
+
+**Wired "Gradle build failed" happens sometimes, just save all and restart Unity will fix it.**
+
 ### Capture Button Events
     WaveVR_Controller.EDeviceType curFocusControllerType = WaveVR_Controller.EDeviceType.Head;
     WaveVR_Controller.EDeviceType DomFocusControllerType = WaveVR_Controller.EDeviceType.Dominant;
@@ -44,7 +47,8 @@ Be able to draw continuous strokes in 3D using a handheld controller
         currLine.SetVertexCount(numClicks + 1);
         currLine.SetPosition(numClicks, WaveVR_Controller.Input(DomFocusControllerType).transform.pos);
 ### Using Graphics Line Renderer
-Follow [this blog](http://www.everyday3d.com/blog/index.php/2010/03/15/3-ways-to-draw-3d-lines-in-unity3d/) to use a "better" line renderer that generate lines which won't change when camera moving
+Follow [this blog](http://www.everyday3d.com/blog/index.php/2010/03/15/3-ways-to-draw-3d-lines-in-unity3d/) to use a "better" line renderer that generate lines which won't "rotate" when camera moving
+LineRenderer also works well~
 ## Color Picker
 Change stroke's color
 Using Package Simple Color Picker
@@ -56,6 +60,10 @@ Using Package Simple Color Picker
         currLine.lmat.color = ColorManager.Instance.GetCurrentColor();
 
 ## Stroke Size 
+Follow [this doc](https://hub.vive.com/storage/app/doc/en-us/WaveVR_SystemEvent.html) to use Swipe Event on both controller to change stroke size. 
+
+        case WVR_EventType.WVR_EventType_LeftToRightSwipe:
+                width += 0.02f;
 ## Navigation:
 * Scale, rotate, and move your sketch (or your position within the sketch).
 * Teleport to different locations within the sketch.

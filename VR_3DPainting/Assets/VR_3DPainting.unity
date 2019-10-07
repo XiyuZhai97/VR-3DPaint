@@ -892,6 +892,10 @@ PrefabInstance:
       propertyPath: isControllerFocus_R
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: 400014, guid: 9b8bf495b9ea945418b0f25722239846, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: -2.6
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 9b8bf495b9ea945418b0f25722239846, type: 3}
 --- !u!1 &1178957959 stripped
@@ -1093,7 +1097,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   trackedObj: {fileID: 1328440791}
-  lMat: {fileID: 2100000, guid: caa3fdce8076ff5439f00a7d894f68db, type: 2}
+  lMat: {fileID: 2100000, guid: d36e2ae9bb4a8304cb4b11e1d60b7716, type: 2}
 --- !u!4 &2062173764
 Transform:
   m_ObjectHideFlags: 0

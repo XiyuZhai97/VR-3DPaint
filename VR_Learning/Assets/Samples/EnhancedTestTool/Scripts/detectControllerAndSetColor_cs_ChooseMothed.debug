@@ -1,0 +1,1532 @@
+﻿using UnityEngine;
+using System.Collections;
+using UnityEngine.UI;
+using wvr;
+using WaveVR_Log;
+using UnityEngine.SceneManagement;
+using System.Threading;
+
+using System.IO;
+using System.Collections.Generic;
+//using System;
+// 四元数的基本数学方程为 : q = cos (a/2) + i(x * sin(a/2)) + j(y * sin(a/2)) + k(z * sin(a/2)) 其中a表示旋转角度，(x,y,z)表示旋转轴。注意：q^2 = 1.
+
+public class detectControllerAndSetColor : MonoBehaviour
+{
+	private static string LOG_TAG = "detectControllerAndSetColor";
+    
+	private Thread detectPoseAndJudgeMovingThread;
+	private bool bIsRunningThread=false;
+	private bool bExitDetectPoseLoop=true;
+	private WVR_DeviceType g_typeDevice = 0;
+	private const int ReadPoseFrequence = 1000; //Hz 采样的密度与上下次采样旋转的角度有关系，也就是与闸值有关（gMotionToPhotonAccThreshold）和minValidImuXYZ
+//	private int ReadPoseFrequence = 1000; //Hz 采样的密度与上下次采样旋转的角度有关系，也就是与闸值有关（gMotionToPhotonAccThreshold）和minValidImuXYZ
+//	private const int ReadPoseFrequence = 100; //Hz 采样的密度与上下次采样旋转的角度有关系，也就是与闸值有关（gMotionToPhotonAccThreshold）和minValidImuXYZ
+	private int nLastHightLightFrameCount = -1;
+
+	
+	const int NUM_SKIP_FRAMES =  10;
+	private string pathUpMenuScene = "Assets/Scenes/SelectTestItem.unity";
+	private int nSkipFrameCount;
+	public bool m_isHmd;
+	public bool m_isUseSvrWraperRender;
+	public bool bIsUsingListenHmdRotation; // = true;
+	
+	private string RED_LED_DEV = "//sys//class//leds//red//brightness";
+//    private string GREEN_LED_DEV = "//sys//class//leds//green//brightness";
+//    private string BLUE_LED_DEV = "//sys//class//leds//blue//brightness";
+//    private string LCD_BACKLIGHT_DEV = "//sys//class//leds//lcd-backlight//brightness";
+
+//	private string RED_LED_DEV = "/sys/class/leds/red/brightness";
+    private string GREEN_LED_DEV = "/sys/class/leds/green/brightness";
+    private string BLUE_LED_DEV = "/sys/class/leds/blue/brightness";
+    private string LCD_BACKLIGHT_DEV = "/sys/class/leds/lcd-backlight/brightness";
+
+	
+    const float epsilonControllerRotation = 0.1f;    //0.000175
+    const float epsilonHmdRotation = 0.1f; //1.0f;    //0.000175
+//	VAR(float, gMotionToPhotonAccThreshold, 0.999998f, kVariableNonpersistent);  //Minimum threshold for motion to be considered significant enough to light the display
+//    const float gMotionToPhotonAccThreshold = 0.999999f;// cos(0.0810285度)=0.99999902522441504714715077799828 这是SVRsensor的采样频率为500Hz,旋转角度为2*0.08=0.16度
+                                              //0.9999989
+
+//	const float gMotionToPhotonAccThreshold = 0.99999898672074237001559758173048;//这是最小的浮点表示角度 fIMUDegreesDiff1=0.1631294 cos(0.0815647度)
+    const float gMotionToPhotonAccThreshold = 0.9999985f;// cos(0.1度)=0.99999847691329 这是SVRsensor的采样频率为500Hz,旋转角度为2*0.1=0.2度
+                                              //0.9999989
+//    const float gMotionToPhotonAccThreshold = 0.9986f;// cos9(3度)=0.99862953475457387378449205843944 这是SVRsensor的采样频率为500Hz
+	const float gMinDegreeMoving = 0.1631294f;////这是最小的浮点表示角度
+    const float minValidImuXYZ = 0.0005f;//(x * sin(a/2))^2+(y * sin(a/2))^2+(z * sin(a/2))^2=(x^2+y^2+z^2)* sin(a/2)^2=sin(a/2)^2
+										 //sin(0.1度)=0.00174532836589830883577820272085 sin(0.1度)^2 =3.0461711048092610090346068792767e-6 ==3.046e-6 
+										 //set minValidImuXYZ =  开根号(sin(a/2)^2/3) == 0.00100763750095623839546411356484
+										 //如果a=0.1度，sin(a/2)即sin(0.05度)=8.7266451523514954330458929907378e-4，sin(0.05度)^2 =7.6154335615059854937603714361717e-7
+										 //set minValidImuXYZ =  开根号(sin(a/2)^2/3) == 5.0383309278324786294360272627746e-4=0.000503
+										 //避免四元素全值都为0的无效值作为有效值判断。
+	const float gPositionThresholdMotionToPhoton = 	1.0e-4f;	
+    const float gMotionToRenderDegreesThreshold = 0.002f; //设置闸值角度；
+	
+	private float epsilon;
+    private long SCALEROT = 10;
+    private long SCALEPOS = 1000;
+
+    private Vector3 lastRotation = new Vector3(0, 0, 0);
+    private Vector3 targetRotation;
+	private Color   targetColor; 
+//    private bool firstEnter = true;
+//    private bool isDraw = false;
+    private const int drawTimes = 1;//2;//120;
+    private int currentTimes = 0;
+    public const string LEFTEYE = "Eye Left";
+    public const string RIGHTEYE = "Eye Right";
+    Camera leftCamera=null;
+    Camera rightCamera=null;
+    Transform head;// = new Transform();
+    private Color gray = new Color(0.30f, 0.30f, 0.37f, 1.0f);
+    private Color black = new Color(0.0f, 0.0f, 0.0f, 1.0f);
+
+    private Vector3 displayRotation = new Vector3(0, 0, 0);
+    private Vector3 displayPosition = new Vector3(0, 0, 0);
+    private Vector3 controllerRotation = new Vector3(0, 0, 0);
+    private Vector3 controllerPosition = new Vector3(0, 0, 0);
+	
+    private Quaternion LastQuaternion = new Quaternion(0, 0, 0, 0);
+    private Quaternion NowQuaternion = new Quaternion(0, 0, 0, 0);
+    private Quaternion ControllerQuaternion = new Quaternion(0, 0, 0, 0);
+    private Quaternion HmdQuaternion = new Quaternion(0, 0, 0, 0);
+	
+	
+//    public bool isValid = false;
+//    public bool inversePos = false;
+//    public bool trackPose = true;
+//    public bool inverseRotation = false;
+//    public bool trackRotation = true;
+    /// <summary>
+    /// The index of this controller device, it should be unique.
+    /// </summary>
+//	public WVR_DeviceType index;
+	public Object m_WaveVR_PlatformObj;
+	public Object m_WaveVR_ControllerObj;	
+//    GameObject text=null;
+    private bool cptEnabled = false;
+
+	WaveVR.Device HmdDevice = null;
+	WaveVR.Device RightController = null;
+	WaveVR.Device LeftController = null;	
+
+//	public RenderSettings MyRenderSetting;
+//	public WaveVR_RenderMask MyRenderMask;
+//	GameObject[] MyRootGameObjects;
+	
+	
+	Scene MyNowScene;
+	
+	private string StoreLcdBackLightValue;
+	
+	
+	private void RestoreLightLED()
+	{
+		StreamReader sr;
+		FileInfo t = new FileInfo(LCD_BACKLIGHT_DEV);     
+		if(!t.Exists)          
+		{            
+			Log.d (LOG_TAG, "LED:"+LCD_BACKLIGHT_DEV+" is not exist!!");
+
+		}		
+		else      
+		{
+			sr = File.OpenText(LCD_BACKLIGHT_DEV);
+			StoreLcdBackLightValue = sr.ReadLine();
+			sr.Close();
+			sr.Dispose();
+		}
+	}
+	
+	private void ResetLightLED()
+	{
+		StreamWriter sw;
+		FileInfo t = new FileInfo(LCD_BACKLIGHT_DEV);     
+		if(!t.Exists)          
+		{            
+			Log.d (LOG_TAG, "LED:"+LCD_BACKLIGHT_DEV+" is not exist!!");
+
+		}		
+		else      
+		{
+			sw = t.AppendText();
+			sw.WriteLine(StoreLcdBackLightValue);
+			sw.Close();
+			sw.Dispose();
+		}
+	}
+
+	private void openLightLED(bool on)
+	{
+		StreamWriter sw;
+		StreamReader sr;
+		
+		FileInfo t = new FileInfo(LCD_BACKLIGHT_DEV);     
+		if(!t.Exists)          
+		{            
+			Log.d (LOG_TAG, "LED:"+LCD_BACKLIGHT_DEV+" is not exist!!");
+
+		}		
+		else      
+		{
+			sw = t.AppendText();
+			if(on){
+				sw.WriteLine("255");
+			}else{
+				sw.WriteLine("0");
+			}				
+			sw.Close();
+			sw.Dispose();
+			sr = File.OpenText(LCD_BACKLIGHT_DEV);
+			Log.d(LOG_TAG,LCD_BACKLIGHT_DEV+"is ="+sr.ReadLine()+".");
+			sr.Close();
+			sr.Dispose();
+		}
+        openOtherLightLEDs(on);		
+	}
+     
+
+	private void openOtherLightLEDs(bool on)
+	{
+		StreamWriter sw;     
+		FileInfo t = new FileInfo(RED_LED_DEV);     
+//		FileInfo t = new FileInfo(GREEN_LED_DEV);     
+		if(!t.Exists)          
+		{            
+			Log.d (LOG_TAG, "LED:"+RED_LED_DEV+" is not exist!!");
+
+		}		
+		else      
+		{
+			sw = t.AppendText();
+			if(on)
+				sw.WriteLine("255");
+			else
+				sw.WriteLine("0");				
+			sw.Close();
+			sw.Dispose();			
+			if(!on){
+				t = new FileInfo(GREEN_LED_DEV);
+				if(t.Exists)
+				{
+					sw = t.AppendText();
+					sw.WriteLine("0");				
+					sw.Close();
+					sw.Dispose();			
+				}
+				t = new FileInfo(BLUE_LED_DEV);
+				if(t.Exists)
+				{
+					sw = t.AppendText();
+					sw.WriteLine("0");				
+					sw.Close();
+					sw.Dispose();			
+				}
+			}
+		} 
+	}
+
+	int prevFrame_connected = -1;
+	private bool AllowGetConnectionState()
+	{
+		if (Time.frameCount != prevFrame_connected)
+		{
+			prevFrame_connected = Time.frameCount;
+			return true;
+		}
+
+		return false;
+	}
+	
+	internal bool _connected = false;
+	/// Whether is the device connected.
+	public bool connected
+	{
+		get
+		{
+			if (AllowGetConnectionState ())
+			{
+				_connected = Interop.WVR_IsDeviceConnected (g_typeDevice); //(DeviceType);
+			}
+				return _connected;
+		}
+	}
+		
+		int prevFrame_pose = -1;
+	private bool AllowGetPoseState()
+	{
+		if (!connected)
+			return false;
+
+		if (Time.frameCount != prevFrame_pose)
+		{
+			prevFrame_pose = Time.frameCount;
+			return true;
+		}
+
+		return false;
+	}
+
+	internal WVR_PoseState_t LastPose;
+	internal WVR_PoseState_t NowPose;
+	
+	Quaternion preQuaternion =  new Quaternion(0,0,0,0);
+	Quaternion currentQuaternion =  new Quaternion(0,0,0,0);
+	Quaternion detaQuaternion =  new Quaternion(0,0,0,0);
+	Vector3    prePosition  = new Vector3(0,0,0);
+	Vector3    currentPosition  = new Vector3(0,0,0);
+	Vector3    detaPosition  = new Vector3(0,0,0);
+
+
+	Quaternion preRawQuaternion =  new Quaternion(0,0,0,0);
+	Quaternion currentRawQuaternion =  new Quaternion(0,0,0,0);
+
+  /**
+  package com.finchtechnologies.android.definition;
+  public final class Vector3 {
+    public float x;
+    public float y;
+    public float z;
+    public Vector3(float x, float y, float z) {
+        this.x = x;
+        this.y = y;
+        this.z = z;
+    }
+  }
+  public final class Quaternion {
+    public float x;
+    public float y;
+    public float z;
+    public float w;
+
+    public Quaternion(float x, float y, float z, float w) {
+        this.x = x;
+        this.y = y;
+        this.z = z;
+        this.w = w;
+    }
+  };
+  */
+  /*
+     public static float normalizeAngle(float angle) {
+        while (angle < -java.lang.Mathf.PI)
+            angle += 2 * java.lang.Mathf.PI;
+        while (angle > java.lang.Mathf.PI)
+            angle -= 2 * java.lang.Mathf.PI;
+        return angle;
+    }
+
+    public static Vector3 normalizeEulerAngles(Vector3 eulerAngles) {
+        eulerAngles.x = normalizeAngle(eulerAngles.x);
+        eulerAngles.y = normalizeAngle(eulerAngles.y);
+        eulerAngles.z = normalizeAngle(eulerAngles.z);
+        return eulerAngles;
+    }
+
+    private static void normalize(Quaternion q) {
+        float len = length(q);
+
+        if (equalsZero(len - 1.0f) || equalsZero(len))
+            return;
+
+        q.x /= len;
+        q.y /= len;
+        q.z /= len;
+        q.w /= len;
+    }
+
+    private static Quaternion normalized(Quaternion q) {
+        float lenSqr = lengthSquared(q);
+
+        if (equalsZero(lenSqr - 1.0f))
+            return new Quaternion(q.x, q.y, q.z, q.w);
+
+        if (!equalsZero(lenSqr)) {
+            float lenSqrt = sqrtf(lenSqr);
+            return new Quaternion(q.x / lenSqrt, q.y / lenSqrt, q.z / lenSqrt, q.w / lenSqrt);
+        }
+
+        return new Quaternion(0f, 0f, 0f, 0f);
+    }
+
+    private static float sqrtf(float value) {
+        return (float) java.lang.Math.sqrt(value);
+    }
+
+    private static float length(Quaternion q) {
+        return (float) java.lang.Math.sqrt(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w);
+    }
+
+    private static float lengthSquared(Quaternion q) {
+        return q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w;
+    }
+
+    public static void add(Vector3 v1, Vector3 v2) {
+        v1.x += v2.x;
+        v1.y += v2.y;
+        v1.z += v2.z;
+    }
+
+    public static Quaternion inverted(Quaternion q) {
+        float lengthSq = lengthSquared(q);
+
+        if (!equalsZero(lengthSq)) {
+            lengthSq = 1.0f / lengthSq;
+            return new Quaternion(-q.x * lengthSq, -q.y * lengthSq, -q.z * lengthSq, q.w * lengthSq);
+        }
+
+        return new Quaternion(0f, 0f, 0f, 0f);
+    }
+
+    public static Quaternion conjugated(Quaternion q) {
+        return new Quaternion(-q.x, -q.y, -q.z, q.w);
+    }
+
+*/
+
+  /*
+     * Transform orientation from quaternion form to euler angles form.
+     * @param q1
+     * @return orientation in euler angles form
+     */
+    public Vector3 toEuler(Quaternion q1) {
+        // Algorithm from:
+        // http://www.euclideanspace.com/maths/geometry/rotations/conversions/quaternionToEuler/index.htm
+
+        float sqw = q1.w * q1.w;
+        float sqx = q1.x * q1.x;
+        float sqy = q1.y * q1.y;
+        float sqz = q1.z * q1.z;
+        float unit = sqx + sqy + sqz + sqw;
+
+        float test = q1.x * q1.y + q1.z * q1.w;
+
+        // Singularity at north pole.
+        if (test > 0.499f * unit)
+            return new Vector3((float)(2.0f * Mathf.Atan2(q1.x, q1.w)), (float)Mathf.PI / 2.0f, 0.0f);
+
+        // Singularity at south pole.
+        if (test < -0.499f * unit)
+            return new Vector3((float)(-2.0f * Mathf.Atan2(q1.x, q1.w)), (float)-Mathf.PI / 2.0f, 0.0f);
+
+        return new Vector3(
+                (float) Mathf.Atan2(2.0f * q1.y * q1.w - 2.0f * q1.x * q1.z, sqx - sqy - sqz + sqw),
+                (float) Mathf.Asin(2.0f * test / unit),
+                (float) Mathf.Atan2(2.0f * q1.x * q1.w - 2.0f * q1.y * q1.z, -sqx + sqy - sqz + sqw)
+        );
+    }
+
+    public static Quaternion mult(Quaternion q1, Quaternion q2) {
+        float ww = (q1.z + q1.x) * (q2.x + q2.y);
+        float yy = (q1.w - q1.y) * (q2.w + q2.z);
+        float zz = (q1.w + q1.y) * (q2.w - q2.z);
+        float xx = ww + yy + zz;
+        float qq = 0.5f * (xx + (q1.z - q1.x) * (q2.x - q2.y));
+
+        float w = qq - ww + (q1.z - q1.y) * (q2.y - q2.z);
+        float x = qq - xx + (q1.x + q1.w) * (q2.x + q2.w);
+        float y = qq - yy + (q1.w - q1.x) * (q2.y + q2.z);
+        float z = qq - zz + (q1.z + q1.y) * (q2.w - q2.x);
+
+        return new Quaternion(x, y, z, w);
+    }
+	    /**
+     * Returns inverse rotation quaternion around same axis.
+     * @param source rotation quaternion
+     * @return inverse to source rotation quaternion
+     */
+    public static Quaternion conjugated(Quaternion q) {
+        return new Quaternion(-q.x, -q.y, -q.z, q.w);
+    }
+
+	float fDegreesDiff=0.0f;
+	float fDegreesDiffMatrix=0.0f;
+	
+    private  bool isIMUWielded(Quaternion qNow,Quaternion qOld){
+        float motionThreshold = 0.002f;
+        bool isMontioned = false;
+		float fIMUDegreesDiff1=0.0f;
+		float fIMUDegreesDiff2=0.0f;
+		Quaternion qTemp = mult(conjugated(qOld), qNow);
+		fIMUDegreesDiff1 = Quaternion.Angle(qOld, qNow);
+
+	Log.d (LOG_TAG, "isIMUWielded-->fIMUDegreesDiff1="+fIMUDegreesDiff1+";"); 
+		DumpQuatertion(qOld);
+		DumpQuatertion(qNow);
+		DumpQuatertion(qTemp);
+		
+		Vector3 DeltaDeg = toEuler(qTemp);
+		qTemp = conjugated(qOld)*qNow;
+		DumpQuatertion(qTemp);
+
+		if ((Mathf.Abs(DeltaDeg.x) > motionThreshold) ||
+				(Mathf.Abs(DeltaDeg.y) > motionThreshold) ||
+				(Mathf.Abs(DeltaDeg.z) > motionThreshold)) {
+			isMontioned = true;
+			Log.d (LOG_TAG, "isIMUWielded BackLight LCD!!fIMUDegreesDiff1="+fIMUDegreesDiff1+",DeltaDeg={"+DeltaDeg.x+","+DeltaDeg.y+","+DeltaDeg.z+"}.fDegreesDiff="+fDegreesDiff+",fDegreesDiffMatrix="+fDegreesDiffMatrix+",w="+detaQuatFromMatrix.w+",w2="+detaQuaternion.w);
+			if(Mathf.Abs(fIMUDegreesDiff1) < gMinDegreeMoving){
+				Log.d (LOG_TAG, "Error. isIMUWielded BackLight LCD!!fIMUDegreesDiff1="+fIMUDegreesDiff1+";");
+			}
+		}else{
+			Log.d (LOG_TAG, "fIMUDegreesDiff1="+fIMUDegreesDiff1+",DeltaDeg={"+DeltaDeg.x+","+DeltaDeg.y+","+DeltaDeg.z+"}.fDegreesDiff="+fDegreesDiff+",fDegreesDiffMatrix="+fDegreesDiffMatrix+",w="+detaQuatFromMatrix.w+",w2="+detaQuaternion.w); 			
+			if(Mathf.Abs(fIMUDegreesDiff1) >= gMinDegreeMoving){
+				Log.d (LOG_TAG, "Error.fIMUDegreesDiff1="+fIMUDegreesDiff1+";");
+				isMontioned = true;
+			}
+		}
+		
+        return isMontioned;
+    }
+
+	internal WVR_Matrix4f_t matrixFromOldToNow;
+	internal WVR_Quatf_t    QuatfFromOldToNow;
+    private  bool isMovingByMatrixDD(WVR_Matrix4f_t matrixOld,WVR_Matrix4f_t matrixNow)
+	{
+//		T =R1*M^(-1)=matrixNow*matrixOld^(-1)
+        bool isMoving = false;
+		float EPSILON = 0.00001f;
+        float determinant, invDeterminant;
+
+        float[] tmp  = new float [9];
+        float[] m = new float [9];		
+        WVR_Matrix4f_t tmpmax;
+		
+		m[0] = matrixOld.m0;
+		m[1] = matrixOld.m1;
+		m[2] = matrixOld.m2;
+		tmpmax.m3 = matrixOld.m3;
+
+		m[3] = matrixOld.m4;
+		m[4] = matrixOld.m5;
+		m[5] = matrixOld.m6;
+		tmpmax.m7 = matrixOld.m7;
+
+		m[6] = matrixOld.m8;
+		m[7] = matrixOld.m9;
+		m[8] = matrixOld.m10;
+		tmpmax.m11 = matrixOld.m11;
+
+		tmpmax.m12 = matrixOld.m12;
+		tmpmax.m13 = matrixOld.m13;
+		tmpmax.m14 = matrixOld.m14;
+		tmpmax.m15 = matrixOld.m15;
+		
+
+        tmp[0] = m[4] * m[8] - m[5] * m[7];
+        tmp[1] = m[2] * m[7] - m[1] * m[8];
+        tmp[2] = m[1] * m[5] - m[2] * m[4];
+        tmp[3] = m[5] * m[6] - m[3] * m[8];
+        tmp[4] = m[0] * m[8] - m[2] * m[6];
+        tmp[5] = m[2] * m[3] - m[0] * m[5];
+        tmp[6] = m[3] * m[7] - m[4] * m[6];
+        tmp[7] = m[1] * m[6] - m[0] * m[7];
+        tmp[8] = m[0] * m[4] - m[1] * m[3];
+
+        // check determinant if it is 0
+        determinant = m[0] * tmp[0] + m[1] * tmp[3] + m[2] * tmp[6];
+        if(Mathf.Abs(determinant) <= EPSILON) //EPSILON
+            return isMoving; //identity(); // cannot inverse, make it idenety matrix
+
+        // divide by the determinant
+        invDeterminant = 1.0f / determinant;
+        tmpmax.m0 = invDeterminant * tmp[0];
+        tmpmax.m1 = invDeterminant * tmp[1];
+        tmpmax.m2 = invDeterminant * tmp[2];
+		
+        tmpmax.m4 = invDeterminant * tmp[3];
+        tmpmax.m5 = invDeterminant * tmp[4];
+        tmpmax.m6 = invDeterminant * tmp[5];
+		
+        tmpmax.m8 = invDeterminant * tmp[6];
+        tmpmax.m9 = invDeterminant * tmp[7];
+        tmpmax.m10 = invDeterminant * tmp[8];
+
+
+		matrixFromOldToNow.m0=matrixNow.m0*tmpmax.m0+matrixNow.m1*tmpmax.m4+matrixNow.m2*tmpmax.m8;//+matrixNow.m3*tmpmax.m12
+		matrixFromOldToNow.m1=matrixNow.m0*tmpmax.m1+matrixNow.m1*tmpmax.m5+matrixNow.m2*tmpmax.m9;//+matrixNow.m3*tmpmax.m13
+		matrixFromOldToNow.m2=matrixNow.m0*tmpmax.m2+matrixNow.m1*tmpmax.m6+matrixNow.m2*tmpmax.m10;//+matrixNow.m3*tmpmax.m14
+		matrixFromOldToNow.m3=matrixNow.m0*tmpmax.m3+matrixNow.m1*tmpmax.m7+matrixNow.m2*tmpmax.m11+matrixNow.m3*tmpmax.m15;
+
+
+		matrixFromOldToNow.m4=matrixNow.m4*tmpmax.m0+matrixNow.m5*tmpmax.m4+matrixNow.m6*tmpmax.m8;//+matrixNow.m7*tmpmax.m12
+		matrixFromOldToNow.m5=matrixNow.m4*tmpmax.m1+matrixNow.m5*tmpmax.m5+matrixNow.m6*tmpmax.m9;//+matrixNow.m7*tmpmax.m13
+		matrixFromOldToNow.m6=matrixNow.m4*tmpmax.m2+matrixNow.m5*tmpmax.m6+matrixNow.m6*tmpmax.m10;//+matrixNow.m7*tmpmax.m14
+		matrixFromOldToNow.m7=matrixNow.m4*tmpmax.m3+matrixNow.m5*tmpmax.m7+matrixNow.m6*tmpmax.m11+matrixNow.m7*tmpmax.m15;
+
+		matrixFromOldToNow.m8=matrixNow.m8*tmpmax.m0+matrixNow.m9*tmpmax.m4+matrixNow.m10*tmpmax.m8;//+matrixNow.m11]*tmpmax.m12
+		matrixFromOldToNow.m9=matrixNow.m8*tmpmax.m1+matrixNow.m9*tmpmax.m5+matrixNow.m10*tmpmax.m9;//+matrixNow.m11]*tmpmax.m13
+		matrixFromOldToNow.m10=matrixNow.m8*tmpmax.m2+matrixNow.m9*tmpmax.m6+matrixNow.m10*tmpmax.m10;//+matrixNow.m11]*tmpmax.m14
+		matrixFromOldToNow.m11=matrixNow.m8*tmpmax.m3+matrixNow.m9*tmpmax.m7+matrixNow.m10*tmpmax.m11+matrixNow.m11*tmpmax.m15;
+
+		matrixFromOldToNow.m12=matrixNow.m12*tmpmax.m0+matrixNow.m13*tmpmax.m4+matrixNow.m14*tmpmax.m8;//+matrixNow.m[15]*tmpmax.m12
+		matrixFromOldToNow.m13=matrixNow.m12*tmpmax.m1+matrixNow.m13*tmpmax.m5+matrixNow.m14*tmpmax.m9;//+matrixNow.m[15]*tmpmax.m13
+		matrixFromOldToNow.m14=matrixNow.m12*tmpmax.m2+matrixNow.m13*tmpmax.m6+matrixNow.m14*tmpmax.m10;//+matrixNow.m[15]*tmpmax.m14
+		matrixFromOldToNow.m15=matrixNow.m12*tmpmax.m3+matrixNow.m13*tmpmax.m7+matrixNow.m14*tmpmax.m11+matrixNow.m15*tmpmax.m15;
+
+		Interop.WVR_ConvertMatrixQuaternion(ref matrixFromOldToNow,ref QuatfFromOldToNow,true); //WVR_Quatf_t
+		Log.d (LOG_TAG, "isMovingByMatrixDD::"); 
+		DumpWVR_Matrix4f(matrixFromOldToNow);
+//		DumpQuatertion(QuatfFromOldToNow);
+		Log.d (LOG_TAG,"QuatfFromOldToNow={"+QuatfFromOldToNow.w+","+QuatfFromOldToNow.x+","+QuatfFromOldToNow.y+","+QuatfFromOldToNow.z+"}");
+		if( Mathf.Abs(QuatfFromOldToNow.w) < gMotionToPhotonAccThreshold)
+		{
+			Log.d (LOG_TAG," QuatisMoving = true, fFromOldToNow={"+QuatfFromOldToNow.w+","+QuatfFromOldToNow.x+","+QuatfFromOldToNow.y+","+QuatfFromOldToNow.z+"}");
+			isMoving = true;
+		}
+		
+		return isMoving;		
+	}
+
+//	WVR_Quatf_t NowWvrQuatfFromMatrix;// =  {0,0,0,0}
+	internal WVR_PoseState_t NowPoseFromMatrix;	
+	Quaternion  NowQuatFromMatrix =  new Quaternion(0,0,0,0);
+	Quaternion  preQuatFromMatrix =  new Quaternion(0,0,0,0);
+	Quaternion  detaQuatFromMatrix =  new Quaternion(0,0,0,0);
+	
+
+	
+	private void DetectPoseLoop()
+	{
+//		WVR_PoseState_t LastPose;
+//		WVR_PoseState_t NowPose;
+		long tNsNowGet=0;
+		long tNsGenPose=0;
+		long tNsFromGenToGet=0;
+		long tMsFromGenToGet=0;
+
+		long tNsLastTimeGet=0;
+		long tNsLastTimeGen=0;
+		long tNsFromLastGenToNowGet=0;
+		long tMsFromLastGenToNowGet=0;
+		long tNsJudgePose=0;
+		long tMsJudgePose=0;
+		
+		bool isMovingByMatrix =false;
+		bool isIMUWieldFromMatrix = false;
+		bool isIMUWieldRawPose = false;
+		
+		bIsRunningThread = true;
+		while(!bExitDetectPoseLoop)
+		{
+			
+//		        public static extern void WVR_GetPoseState(WVR_DeviceType type, WVR_PoseOriginModel originModel, uint predictedMilliSec, ref WVR_PoseState_t poseState);
+			Interop.WVR_GetPoseState (g_typeDevice,WVR_PoseOriginModel.WVR_PoseOriginModel_OriginOnTrackingObserver,0,ref NowPose);
+//			Interop.WVR_GetPoseState (g_typeDevice,WVR_PoseOriginModel.WVR_PoseOriginModel_OriginOnHead_3DoF,0,ref NowPose);
+			if(NowPose.IsValidPose)
+			{
+				if(tNsGenPose == NowPose.PoseTimestamp_ns) //得到上次有效的同样的数据
+				{
+					Thread.Sleep(1000/ReadPoseFrequence);
+					continue;
+				}
+				isMovingByMatrix = isMovingByMatrixDD(LastPose.PoseMatrix,NowPose.PoseMatrix);
+				tNsJudgePose = Interop.WVR_GetNanoTime();
+				DumpPoseState(NowPose);
+				if(!m_isHmd  && 0 == NowPose.RawPose.rotation.w &&
+				0 == NowPose.RawPose.rotation.x &&
+				0 == NowPose.RawPose.rotation.y &&
+				0 == NowPose.RawPose.rotation.z )  //use RawPose
+				{ // Controller not get RawPose;
+/*
+void Geometry::QuatToMatrix(WVR_Matrix4f_t *mat, const WVR_Quatf &q) {
+    double sqw = q.w*q.w;
+    double sqx = q.x*q.x;
+    double sqy = q.y*q.y;
+    double sqz = q.z*q.z;
+
+    mat->m[0][0] = ( sqx - sqy - sqz + sqw);
+    mat->m[1][1] = (-sqx + sqy - sqz + sqw);
+    mat->m[2][2] = (-sqx - sqy + sqz + sqw);
+
+    double tmp1 = q.x*q.y;
+    double tmp2 = q.z*q.w;
+    mat->m[1][0] = 2.0 * (tmp1 + tmp2);
+    mat->m[0][1] = 2.0 * (tmp1 - tmp2);
+
+    tmp1 = q.x*q.z;
+    tmp2 = q.y*q.w;
+    mat->m[2][0] = 2.0 * (tmp1 - tmp2);
+    mat->m[0][2] = 2.0 * (tmp1 + tmp2);
+    tmp1 = q.y*q.z;
+    tmp2 = q.x*q.w;
+    mat->m[2][1] = 2.0 * (tmp1 + tmp2);
+    mat->m[1][2] = 2.0 * (tmp1 - tmp2);
+    // stuffing
+    mat->m[3][0] = 0.0f;
+    mat->m[3][1] = 0.0f;
+    mat->m[3][2] = 0.0f;
+    mat->m[3][3] = 1.0f;
+    mat->m[0][3] = 0.0f;
+    mat->m[1][3] = 0.0f;
+    mat->m[2][3] = 0.0f;
+}
+
+void Geometry::MatrixToQuat(WVR_Quatf *q, const WVR_Matrix4f_t &mx) {
+    // GetRotation
+    float trace = mx.m[0][0] + mx.m[1][1] + mx.m[2][2];
+    if( trace > 0 ) {
+        float s = 0.5f / sqrtf(trace+ 1.0f);
+        q->w = 0.25f / s;
+        q->x = ( mx.m[2][1] - mx.m[1][2] ) * s;
+        q->y = ( mx.m[0][2] - mx.m[2][0] ) * s;
+        q->z = ( mx.m[1][0] - mx.m[0][1] ) * s;
+    } else {
+        if ( mx.m[0][0] > mx.m[1][1] && mx.m[0][0] > mx.m[2][2] ) {
+            float s = 2.0f * sqrtf( 1.0f + mx.m[0][0] - mx.m[1][1] - mx.m[2][2]);
+            if (s > 0) {
+                q->w = (mx.m[2][1] - mx.m[1][2] ) / s;
+                q->x = 0.25f * s;
+                q->y = (mx.m[0][1] + mx.m[1][0] ) / s;
+                q->z = (mx.m[0][2] + mx.m[2][0] ) / s;
+            }
+        } else if (mx.m[1][1] > mx.m[2][2]) {
+            float s = 2.0f * sqrtf( 1.0f + mx.m[1][1] - mx.m[0][0] - mx.m[2][2]);
+            if (s > 0) {
+                q->w = (mx.m[0][2] - mx.m[2][0] ) / s;
+                q->x = (mx.m[0][1] + mx.m[1][0] ) / s;
+                q->y = 0.25f * s;
+                q->z = (mx.m[1][2] + mx.m[2][1] ) / s;
+            }
+        } else {
+            float s = 2.0f * sqrtf( 1.0f + mx.m[2][2] - mx.m[0][0] - mx.m[1][1] );
+            if (s > 0) {
+                q->w = (mx.m[1][0] - mx.m[0][1] ) / s;
+                q->x = (mx.m[0][2] + mx.m[2][0] ) / s;
+                q->y = (mx.m[1][2] + mx.m[2][1] ) / s;
+                q->z = 0.25f * s;
+            }
+        }
+    }
+}
+    WVR_Quatf_t Geometry::div(WVR_Quatf_t quaternion, float divisor) {
+        WVR_Quatf_t out;
+        out.x = quaternion.x / divisor;
+        out.y = quaternion.y / divisor;
+        out.z = quaternion.z / divisor;
+        out.w = quaternion.w / divisor;
+        return out;
+    }
+
+    float Geometry::dot(WVR_Quatf_t x, WVR_Quatf_t y){
+        WVR_Quatf_t tmp;
+        tmp.x = x.x * y.x;
+        tmp.y = x.y * y.y;
+        tmp.z = x.z * y.z;
+        tmp.w = x.w * y.w;
+        return (float) ((tmp.x + tmp.y) + (tmp.z + tmp.w));
+    }
+
+    WVR_Quatf_t Geometry::conjugate(WVR_Quatf_t q) {
+        WVR_Quatf_t out;
+        out.x = -q.x;
+        out.y = -q.y;
+        out.z = -q.z;
+        out.w = q.w;
+
+        return out;
+    }
+
+    WVR_Quatf_t Geometry::inverse(WVR_Quatf_t q){
+        WVR_Quatf_t tmp = conjugate(q);
+        float divisor = dot(q, q);
+        return div(tmp, divisor);
+    }
+*/				
+					Interop.WVR_ConvertMatrixQuaternion(ref NowPose.PoseMatrix,ref NowPose.RawPose.rotation,true); //WVR_Quatf_t
+					Log.d (LOG_TAG, "Convert Matrix To Quaternion!!!"); 
+					DumpPoseState(NowPose);
+				}
+				Interop.WVR_ConvertMatrixQuaternion(ref NowPose.PoseMatrix,ref NowPoseFromMatrix.RawPose.rotation,true); //WVR_Quatf_t
+				NowQuatFromMatrix.Set(NowPoseFromMatrix.RawPose.rotation.x,NowPoseFromMatrix.RawPose.rotation.y,NowPoseFromMatrix.RawPose.rotation.z,NowPoseFromMatrix.RawPose.rotation.w);
+				fDegreesDiffMatrix = Quaternion.Angle(preQuatFromMatrix.normalized,NowQuatFromMatrix.normalized);
+				detaQuatFromMatrix = Quaternion.Inverse(preQuatFromMatrix.normalized)*NowQuatFromMatrix.normalized;
+				isIMUWieldFromMatrix = isIMUWielded(NowQuatFromMatrix,preQuatFromMatrix);
+
+				Log.d (LOG_TAG, "NowQuatFromMatrix+preQuatFromMatrix is ");
+				DumpQuatertion(preQuatFromMatrix);
+				DumpQuatertion(NowQuatFromMatrix);
+				Log.d (LOG_TAG, "detaQuatFromMatrix,fDegreesDiffMatrix="+fDegreesDiffMatrix);
+				DumpQuatertion(detaQuatFromMatrix);
+				preQuatFromMatrix = NowQuatFromMatrix;
+				
+
+
+				currentRawQuaternion.w = NowPose.RawPose.rotation.w;
+				currentRawQuaternion.x = NowPose.RawPose.rotation.x;
+				currentRawQuaternion.y = NowPose.RawPose.rotation.y;
+				currentRawQuaternion.z = NowPose.RawPose.rotation.z;
+				
+				currentQuaternion.Set(NowPose.RawPose.rotation.x,NowPose.RawPose.rotation.y,NowPose.RawPose.rotation.z,NowPose.RawPose.rotation.w);
+//				currentQuaternion.w = NowPose.RawPose.rotation.w;
+//				currentQuaternion.x = NowPose.RawPose.rotation.x;
+//				currentQuaternion.y = NowPose.RawPose.rotation.y;
+//				currentQuaternion.z = NowPose.RawPose.rotation.z;
+
+
+//				currentQuaternion = currentQuaternion.normalized; //归一化处理
+				if(NowPose.Is6DoFPose)
+				{
+					currentPosition.x = NowPose.RawPose.position.v0;
+					currentPosition.y = NowPose.RawPose.position.v1;
+					currentPosition.z = NowPose.RawPose.position.v2;
+					detaPosition = currentPosition - prePosition;
+					if(detaPosition.x > gPositionThresholdMotionToPhoton ||
+					 detaPosition.y > gPositionThresholdMotionToPhoton ||
+					 detaPosition.z > gPositionThresholdMotionToPhoton
+					 )
+					Log.d (LOG_TAG, "detaPosition is ={"+detaPosition.x+","+detaPosition.y+","+detaPosition.z+"}.");
+				}
+					
+					
+				
+				detaQuaternion = Quaternion.Inverse(preQuaternion.normalized)*currentQuaternion.normalized;
+				detaQuaternion = detaQuaternion.normalized; //归一化处理
+				fDegreesDiff = Quaternion.Angle(preQuaternion.normalized,currentQuaternion.normalized);
+				
+				if((Mathf.Abs(detaQuaternion.w) < gMotionToPhotonAccThreshold) && (
+					  Mathf.Abs(detaQuaternion.x) > minValidImuXYZ
+					 || Mathf.Abs(detaQuaternion.y) > minValidImuXYZ
+					 || Mathf.Abs(detaQuaternion.z) > minValidImuXYZ
+					 )||(
+					 detaPosition.x > gPositionThresholdMotionToPhoton ||
+					 detaPosition.y > gPositionThresholdMotionToPhoton ||
+					 detaPosition.z > gPositionThresholdMotionToPhoton
+					 ))
+//					if((Mathf.Abs(detaQuaternion.w) < gMotionToPhotonAccThreshold)||(
+//						  Mathf.Abs(detaQuaternion.x)>1.0f-gMotionToPhotonAccThreshold
+//						 || Mathf.Abs(detaQuaternion.y)>1.0f-gMotionToPhotonAccThreshold
+//						 || Mathf.Abs(detaQuaternion.z)>1.0f-gMotionToPhotonAccThreshold
+//						 ))	
+				{
+					openLightLED(true);
+					nLastHightLightFrameCount = Time.frameCount;
+					Log.d (LOG_TAG, "High Light LED and LCD BackLight!!");
+				}else{
+					if(Time.frameCount > nLastHightLightFrameCount+2) //确保至少亮一帧以上时间以便捕捉 再延长1帧
+						openLightLED(false);
+				}
+				Log.d (LOG_TAG, "preQuaternion+currentQuaternion is ");
+				DumpQuatertion(preQuaternion);
+				DumpQuatertion(currentQuaternion);
+				Log.d (LOG_TAG, "detaQuatertion ");
+				DumpQuatertion(detaQuaternion);
+				Log.d (LOG_TAG, "fDegreesDiff= "+fDegreesDiff+",detaQuatertion.eulerAngles={"+detaQuaternion.eulerAngles.x+","+detaQuaternion.eulerAngles.y+","+detaQuaternion.eulerAngles.z+"}.");
+				
+				 
+				preQuaternion = currentQuaternion;
+				prePosition = currentPosition;
+				LastPose = NowPose;
+
+
+				tNsNowGet = Interop.WVR_GetNanoTime();
+				tNsJudgePose = tNsNowGet - tNsJudgePose;
+				tNsFromLastGenToNowGet = tNsNowGet-tNsLastTimeGen;//nTime from LastPoseGenTimeNs to NowGetDataTimeNs 
+				tMsFromLastGenToNowGet = tNsFromLastGenToNowGet/1000000;//nTime from LastPoseGenTimeNs to NowGetDataTimeNs 
+				
+				tNsGenPose =  NowPose.PoseTimestamp_ns;
+				tNsFromGenToGet = tNsNowGet - tNsGenPose;
+				tMsFromGenToGet = tNsFromGenToGet/1000000;
+				tNsLastTimeGen = tNsGenPose;
+				tNsLastTimeGet = tNsNowGet;
+				
+				Log.d (LOG_TAG, "Delay Time:: tNsNowGet="+tNsNowGet+",tNsGenPose="+tNsGenPose+
+				             ",tNsFromGenToGet="+tNsFromGenToGet+",tNsJudgePose="+tNsJudgePose+
+							 ",tNsFromLastGenToNowGet="+tNsFromLastGenToNowGet+
+							 ",tMsFromGenToGet="+tMsFromGenToGet+
+							 ",tMsFromLastGenToNowGet="+tMsFromLastGenToNowGet+".");
+				isIMUWieldRawPose = isIMUWielded(currentRawQuaternion,preRawQuaternion);
+				preRawQuaternion = currentRawQuaternion;
+				tMsJudgePose = tNsJudgePose/1000000;
+				if(tMsFromGenToGet-tMsJudgePose>10)
+				{
+					Log.d (LOG_TAG, "Get Time is long!!tMsFromGenToGet="+tMsFromGenToGet+";");
+				}
+				if(tMsJudgePose>10)
+				{
+					Log.d (LOG_TAG, "Judge Pose Time is long!!tNsJudgePose="+tMsJudgePose+";");
+				}
+				
+				if(isIMUWieldRawPose != isIMUWieldFromMatrix){
+						Log.d (LOG_TAG, "Judge Error-1:isIMUWieldRawPose="+isIMUWieldRawPose+",isIMUWieldFromMatrix="+isIMUWieldFromMatrix+".");
+						Log.d (LOG_TAG, "currentRawQuaternion  is ");
+							DumpQuatertion(currentRawQuaternion);
+						Log.d (LOG_TAG, "NowQuatFromMatrix  is ");
+							DumpQuatertion(NowQuatFromMatrix);
+				}
+				if(isIMUWieldFromMatrix != isMovingByMatrix){
+						Log.d (LOG_TAG, "Judge Error-2:isMovingByMatrix="+isMovingByMatrix+",isIMUWieldFromMatrix="+isIMUWieldFromMatrix+".");
+				}
+				
+				Thread.Sleep(1000/ReadPoseFrequence);
+			}
+		}
+	}
+	
+    void onUninit()
+	{
+		if(bIsRunningThread)
+		{
+			bExitDetectPoseLoop = true;
+			detectPoseAndJudgeMovingThread.Join();
+			bIsRunningThread = false;
+		}
+		
+		if(bIsUsingListenHmdRotation) WaveVR_Utils.Event.Remove(WaveVR_Utils.Event.NEW_POSES, myPos);
+//          WaveVR_Utils.Event.Remove (WaveVR_Utils.Event.NEW_POSES, OnNewPoses);
+//        WaveVR_Utils.Event.Remove (wvr.WVR_EventType.WVR_EventType_RecenterSuccess3DoF.ToString (), OnRecentered);
+        WaveVR_Utils.Event.Remove (WaveVR_Utils.Event.ALL_VREVENT, OnEvent);	
+		if(m_isHmd && m_isUseSvrWraperRender)
+            WaveVR_Utils.SetSubmitOptionalArgument(null, (int)WVR_SubmitExtend.WVR_SubmitExtend_Default);//WVR_SubmitExtend_Default=0,WVR_SubmitExtend_DisableDisortion=1
+		currentTimes = 0;
+		nSkipFrameCount = 0;
+		cptEnabled = false;
+		ResetLightLED();
+	}
+
+    void onInit()
+	{
+		if(bIsUsingListenHmdRotation) WaveVR_Utils.Event.Listen(WaveVR_Utils.Event.NEW_POSES, myPos);
+//          WaveVR_Utils.Event.Listen (WaveVR_Utils.Event.NEW_POSES, OnNewPoses);
+//        WaveVR_Utils.Event.Listen (wvr.WVR_EventType.WVR_EventType_RecenterSuccess3DoF.ToString (), OnRecentered);
+        WaveVR_Utils.Event.Listen (WaveVR_Utils.Event.ALL_VREVENT, OnEvent);
+		currentTimes = 0;
+		nSkipFrameCount = 0;
+		cptEnabled = true;
+		
+		bExitDetectPoseLoop = false;
+		detectPoseAndJudgeMovingThread =  new Thread(DetectPoseLoop);
+		bIsRunningThread = false;
+		RestoreLightLED();
+		
+	}
+	
+	// Use this for initialization
+	void Start () {
+		GameObject vr;
+		
+        Log.d (LOG_TAG, "++Start++,m_isHmd="+m_isHmd+",m_isUseSvrWraperRender="+m_isUseSvrWraperRender);
+		onInit();
+
+		vr = (GameObject)Instantiate(m_WaveVR_PlatformObj);  
+		
+		vr.transform.position = new Vector3 (0f,4f,0f);
+		vr.transform.eulerAngles = new Vector3(0,90,0);
+		head = vr.transform.Find ("head");
+
+//   private GameObject Head = null;
+//			if (Head == null)
+//            {
+//                if (WaveVR_Render.Instance != null)
+//                    Head = WaveVR_Render.Instance.gameObject;
+//            }
+//            if (Head != null)
+//                defaultHeadPosition = Head.transform.localPosition;
+
+//            ReadJsonValues ();
+
+ //           if (this.TrackTiming == WVR_TrackTiming.WhenNewPoses)
+//                WaveVR_Utils.Event.Listen (WaveVR_Utils.Event.NEW_POSES, OnNewPoses);
+//            WaveVR_Utils.Event.Listen (wvr.WVR_EventType.WVR_EventType_RecenterSuccess3DoF.ToString (), OnRecentered);
+//            WaveVR_Utils.Event.Listen (WaveVR_Utils.Event.ALL_VREVENT, OnEvent);
+		
+		
+//        MyRenderMask = (WaveVR_RenderMask) FindObjectOfType(typeof(WaveVR_RenderMask));
+//		Debug.Log("MyRenderMask is " + MyRenderMask);
+	    if(!bIsUsingListenHmdRotation)
+		{			
+			HmdDevice = WaveVR.Instance.getDeviceByType (WVR_DeviceType.WVR_DeviceType_HMD);
+			if (null != HmdDevice && HmdDevice.connected)
+			{
+				g_typeDevice = WVR_DeviceType.WVR_DeviceType_HMD;
+				updatePose (HmdDevice.pose, HmdDevice.rigidTransform);
+				Log.d (LOG_TAG, "Find WVR_DeviceType_HMD!");
+			}
+		}
+        RightController = WaveVR.Instance.getDeviceByType (WVR_DeviceType.WVR_DeviceType_Controller_Right);
+        if (null != RightController && RightController.connected)
+		{
+			g_typeDevice = WVR_DeviceType.WVR_DeviceType_Controller_Right;
+            updatePose (RightController.pose, RightController.rigidTransform);
+			Log.d (LOG_TAG, "Find WVR_DeviceType_Controller_Right!");
+		}
+        LeftController = WaveVR.Instance.getDeviceByType (WVR_DeviceType.WVR_DeviceType_Controller_Left);
+		if(null != LeftController && LeftController.connected)
+		{
+			g_typeDevice = WVR_DeviceType.WVR_DeviceType_Controller_Left;
+            updatePose (LeftController.pose, LeftController.rigidTransform);
+			Log.d (LOG_TAG, "Find WVR_DeviceType_Controller_Left!");
+		}		
+        if(m_isHmd){
+			g_typeDevice = WVR_DeviceType.WVR_DeviceType_HMD;
+			NowQuaternion = HmdQuaternion;
+			targetRotation = displayRotation;
+			epsilon = epsilonHmdRotation;
+			targetColor = Color.yellow;
+			Log.d (LOG_TAG, "Is Testing Hmd!! g_typeDevice="+g_typeDevice);
+		}else{
+//			ReadPoseFrequence = 100; //for Controller set 100Hz.
+			NowQuaternion = ControllerQuaternion;
+			targetRotation = controllerRotation;
+			epsilon = epsilonControllerRotation;
+			targetColor = Color.red;
+			Log.d (LOG_TAG, "Is Testing Controller!! g_typeDevice="+g_typeDevice);
+		}
+		lastRotation.x = targetRotation.x ;//head.localRotation.eulerAngles.x;
+		lastRotation.y = targetRotation.y;//head.localRotation.eulerAngles.y;
+		lastRotation.z = targetRotation.z; //head.localRotation.eulerAngles.z;
+		LastQuaternion = NowQuaternion;
+		
+		MyNowScene = SceneManager.GetActiveScene ();
+/*		
+		MyRootGameObjects = MyNowScene.GetRootGameObjects();
+		foreach (GameObject myTempObject in MyRootGameObjects)
+		{
+			Debug.Log("myTempObject is "+myTempObject);
+		}
+		Debug.Log("--Start--");
+*/		
+        Log.d (LOG_TAG, "--Start--");
+		currentTimes = 0;
+		nSkipFrameCount = 0;
+		cptEnabled = true;
+    }
+
+	// Update is called once per frame
+	void Update () {
+	
+		if(nSkipFrameCount < NUM_SKIP_FRAMES)
+		{
+			nSkipFrameCount++;
+			return;
+		}
+
+		if(m_isHmd && m_isUseSvrWraperRender)
+            WaveVR_Utils.SetSubmitOptionalArgument(null, unchecked((int) 0xF9E8D7C6));
+		else if(!bIsRunningThread){
+			detectPoseAndJudgeMovingThread.Start();	
+			bIsRunningThread =  true;
+			SetLcdRedColor();
+		}else{
+			SetLcdRedColor();
+		}
+//        WaveVR.Device device = WaveVR.Instance.getDeviceByType (this.Type);
+//        if (device.connected)
+//        {
+//            updatePose (device.pose, device.rigidTransform);
+//        }
+		 if(!m_isUseSvrWraperRender && !bIsRunningThread)
+		 {
+			 
+			 
+			if(!bIsUsingListenHmdRotation)
+			{			
+				HmdDevice = WaveVR.Instance.getDeviceByType (WVR_DeviceType.WVR_DeviceType_HMD);
+				if (null != HmdDevice && HmdDevice.connected)
+				{
+//					updatePose (HmdDevice.pose, HmdDevice.rigidTransform);
+				}
+			}
+			RightController = WaveVR.Instance.getDeviceByType (WVR_DeviceType.WVR_DeviceType_Controller_Right);
+			if (null != RightController && RightController.connected)
+			{
+				updatePose (RightController.pose, RightController.rigidTransform);
+/*				
+				Interop.WVR_GetPoseState (WVR_DeviceType.WVR_DeviceType_Controller_Right,WVR_PoseOriginModel.WVR_PoseOriginModel_OriginOnGround,
+								0,
+								ref NowPose);
+				if(NowPose.IsValidPose)
+				{
+						Interop.WVR_ConvertMatrixQuaternion(ref NowPose.PoseMatrix,ref NowPose.RawPose.rotation,true); //WVR_Quatf_t
+						DumpPoseState(NowPose);
+						NowQuaternion.w = NowPose.RawPose.rotation.w;
+						NowQuaternion.x = NowPose.RawPose.rotation.x;
+						NowQuaternion.y = NowPose.RawPose.rotation.y;
+						NowQuaternion.z = NowPose.RawPose.rotation.z;
+				}
+*/				
+			}
+			LeftController = WaveVR.Instance.getDeviceByType (WVR_DeviceType.WVR_DeviceType_Controller_Left);
+			if(null != LeftController && LeftController.connected)
+			{
+				updatePose (LeftController.pose, LeftController.rigidTransform);
+			}
+//			Log.d (LOG_TAG, "lastRotation="+lastRotation+",targetRotation="+targetRotation);
+			
+			var deltaQ = Quaternion.Inverse(LastQuaternion)*NowQuaternion;
+			
+			Log.d (LOG_TAG, "LastQ={"+LastQuaternion.w+","+LastQuaternion.x+","+LastQuaternion.y+","+LastQuaternion.z+
+			   "},NowQ={"+NowQuaternion.w+","+NowQuaternion.x+","+NowQuaternion.y+","+NowQuaternion.z+
+			   "},deltaQ={"+deltaQ.w+","+deltaQ.x+","+deltaQ.y+","+deltaQ.z+"}");
+			if((Mathf.Abs(deltaQ.w) < gMotionToPhotonAccThreshold) && (
+				  Mathf.Abs(deltaQ.x) > minValidImuXYZ
+				 || Mathf.Abs(deltaQ.y) > minValidImuXYZ
+				 || Mathf.Abs(deltaQ.z) > minValidImuXYZ
+				 ))	
+//			if((Mathf.Abs(deltaQ.w) < gMotionToPhotonAccThreshold)||(
+//		          Mathf.Abs(deltaQ.x)>1.0f-gMotionToPhotonAccThreshold
+//				 || Mathf.Abs(deltaQ.y)>1.0f-gMotionToPhotonAccThreshold
+//				 || Mathf.Abs(deltaQ.z)>1.0f-gMotionToPhotonAccThreshold
+//				 ))
+			{
+				currentTimes = drawTimes;   // reset
+//				Log.d(LOG_TAG,"set new currentTimes =" +currentTimes);
+			}
+			else
+			{
+//				Log.d(LOG_TAG, "abs different_x="+Mathf.Abs(lastRotation.x - targetRotation.x));
+//				Log.d(LOG_TAG, "abs different_y="+Mathf.Abs(lastRotation.y - targetRotation.y));
+//				Log.d(LOG_TAG, "abs different_z="+Mathf.Abs(lastRotation.z - targetRotation.z));
+//				Log.d(LOG_TAG,"epsilon = "+epsilon);
+				if (currentTimes > 0)
+					currentTimes--;
+			}
+//			Log.d (LOG_TAG, "currentTimes="+currentTimes);	
+
+			if (currentTimes > 0)
+				changeColor();
+			else
+				clearColor();
+
+			lastRotation.x = targetRotation.x ;//head.localRotation.eulerAngles.x;
+			lastRotation.y = targetRotation.y;//head.localRotation.eulerAngles.y;
+			lastRotation.z = targetRotation.z; //head.localRotation.eulerAngles.z;
+			LastQuaternion = NowQuaternion;
+		}//if(!m_isUseSvrWraperRender)
+	    if (Input.anyKeyDown)
+        {
+			
+			Log.d (LOG_TAG, "Input.anyKeyDown is pressed.");
+			GoBackSelectItemOrExitGame();
+/*			
+            foreach (KeyCode keyCode in System.Enum.GetValues(typeof(KeyCode)))
+            {
+                if (Input.GetKeyDown(keyCode))
+                {
+                    Debug.LogError("Current Key is : " + keyCode.ToString());
+                }
+            }
+*/			
+        }
+	}
+
+    private void updatePose(WVR_DevicePosePair_t pairPose, WaveVR_Utils.RigidTransform rtPose)
+    {
+//		WVR_Vector3f_t TempWvrVector3;
+//		WVR_Quatf_t    TempWvrQuat;
+		
+
+
+//        Log.d (LOG_TAG, "updatePose : pairPose type="+pairPose.type);
+
+		if (pairPose.type == WVR_DeviceType.WVR_DeviceType_HMD)
+		{
+			HmdQuaternion = rtPose.rot;
+			displayRotation = rtPose.rot.eulerAngles;
+			displayPosition = rtPose.pos;
+			Log.d (LOG_TAG, "updatePose:controllerRotation="+displayPosition);
+		}
+		if (pairPose.type == WVR_DeviceType.WVR_DeviceType_Controller_Right || pairPose.type == WVR_DeviceType.WVR_DeviceType_Controller_Left)
+		{
+			ControllerQuaternion = rtPose.rot;
+			controllerRotation = rtPose.rot.eulerAngles;
+			controllerPosition = rtPose.pos;
+			Log.d (LOG_TAG, "updatePose:controllerRotation="+controllerRotation);
+		}
+		DumpDevicePosePair(pairPose);
+		DumpRigidTransform(rtPose);
+		
+		if(m_isHmd){
+			targetRotation = displayRotation;
+			NowQuaternion = HmdQuaternion;
+		}else{
+			targetRotation = controllerRotation;
+			NowQuaternion = ControllerQuaternion;
+		}
+	}
+
+    void OnEvent(params object[] args)
+    {
+        WVR_Event_t _event = (WVR_Event_t)args[0];
+        Log.d (LOG_TAG, "OnEvent() " + _event.common.type+",nSkipFrameCount="+nSkipFrameCount);
+		if(nSkipFrameCount < NUM_SKIP_FRAMES)
+			return;
+
+        switch (_event.common.type)
+        {
+        case WVR_EventType.WVR_EventType_ButtonPressed:
+//        case WVR_EventType.WVR_EventType_ButtonUnpressed:
+            // Get system key
+//            if (_event.input.inputId == WVR_InputId.WVR_InputId_Alias1_System) //any Button Unpress
+            {
+                Log.d (LOG_TAG, "OnEvent() WVR_InputId_Alias1_System is pressed.");
+				GoBackSelectItemOrExitGame();
+            }
+            break;
+        case WVR_EventType.WVR_EventType_RecenterSuccess:
+        case WVR_EventType.WVR_EventType_RecenterSuccess3DoF:
+            Log.d (LOG_TAG, "OnEvent() recentered.");
+            break;
+		case WVR_EventType.WVR_EventType_DeviceConnected:
+			if((0 == g_typeDevice) && (WVR_DeviceType.WVR_DeviceType_HMD != _event.device.type))
+			{
+				g_typeDevice = _event.device.type;
+			}
+			break;
+		case WVR_EventType.WVR_EventType_DeviceDisconnected:
+			break;
+        }
+    }	
+	
+    private void myPos(params object[] args)
+    {
+		WVR_DevicePosePair_t[] poss = (WVR_DevicePosePair_t[]) (args [0]); //Acceleration
+		WaveVR_Utils.RigidTransform[] rtPoses = (WaveVR_Utils.RigidTransform[]) (args [1]);
+		
+
+		if (null == poss || poss.Length < 1)
+			return;		
+        Log.d (LOG_TAG, "New Pose : myPos Length="+poss.Length + ",nSkipFrameCount="+nSkipFrameCount);
+		if(nSkipFrameCount < NUM_SKIP_FRAMES)
+			return;
+
+//		if (poss [0].type == WVR_DeviceType.WVR_DeviceType_HMD || poss [0].type == WVR_DeviceType.WVR_DeviceType_Invalid)
+//			return;
+        for(int nIndex=0;nIndex <poss.Length;nIndex++)
+		{
+			if(poss[nIndex].pose.IsValidPose)
+			{
+				
+				switch(poss [nIndex].type)
+				{
+					case WVR_DeviceType.WVR_DeviceType_HMD:
+						HmdQuaternion = rtPoses[nIndex].rot;
+						displayRotation = rtPoses[nIndex].rot.eulerAngles;
+						displayPosition = rtPoses[nIndex].pos;
+						Log.d (LOG_TAG, "New Pose :displayRotation="+displayRotation);
+						break;
+
+					case WVR_DeviceType.WVR_DeviceType_Controller_Left:
+					case WVR_DeviceType.WVR_DeviceType_Controller_Right:
+					    ControllerQuaternion = rtPoses[nIndex].rot;
+						controllerRotation = rtPoses[nIndex].rot.eulerAngles;
+						controllerPosition = rtPoses[nIndex].pos;
+						Log.d (LOG_TAG, "New Pose :controllerRotation="+controllerRotation);
+						break;
+				}
+				DumpDevicePosePair(poss [nIndex]);
+				DumpRigidTransform(rtPoses[nIndex]);
+			}
+		}
+		
+		if(m_isHmd){
+			targetRotation = displayRotation;
+			NowQuaternion = HmdQuaternion;
+		}else{
+			targetRotation = controllerRotation;
+			NowQuaternion = ControllerQuaternion;
+		}
+    }
+
+    private void checkCamera()
+	{
+		if (leftCamera == null) {
+			leftCamera = head.Find (LEFTEYE).GetComponent<Camera> ();
+			if (leftCamera != null) leftCamera.clearFlags = CameraClearFlags.Color;
+			if (leftCamera != null)
+				 Log.d (LOG_TAG, "get matrix vr camera..");
+		}
+		if (rightCamera == null) {
+			rightCamera = head.Find (RIGHTEYE).GetComponent<Camera> (); 
+			if (rightCamera != null) rightCamera.clearFlags = CameraClearFlags.Color;
+		}
+
+	}
+
+		
+	private void SetLcdRedColor()
+	{
+		if (leftCamera == null) {
+			leftCamera = head.Find (LEFTEYE).GetComponent<Camera> ();
+			if (leftCamera != null){
+				leftCamera.clearFlags = CameraClearFlags.Color;
+				Log.d (LOG_TAG, "get matrix vr camera..");
+			    leftCamera.backgroundColor =  targetColor;//Color.red;
+			}
+		}
+		if (rightCamera == null) {
+			rightCamera = head.Find (RIGHTEYE).GetComponent<Camera> (); 
+			if (rightCamera != null){
+				rightCamera.clearFlags = CameraClearFlags.Color;
+				Log.d (LOG_TAG, "get matrix vr left camera..");
+			    rightCamera.backgroundColor =  targetColor;//Color.red;
+			}
+		}
+
+	}
+	
+    private void changeColor()
+    {
+		openLightLED(true);
+/*		
+		checkCamera();
+		if(leftCamera !=null)  leftCamera.backgroundColor =  targetColor;//Color.red;
+		if(rightCamera !=null) rightCamera.backgroundColor =  targetColor;//Color.red;
+*/		
+		
+        Log.d (LOG_TAG, "changeColor!!!!!!!!!!!!!!!!!!!!!");
+    }
+
+    private void clearColor()
+    {
+		openLightLED(false);
+/*		
+		checkCamera();
+		if(leftCamera !=null)  leftCamera.backgroundColor = Color.black;  //gray;
+		if(rightCamera !=null) rightCamera.backgroundColor = Color.black;  //gray;
+*/		
+		
+        Log.d (LOG_TAG, "clearColor!!!!!!!!!!!!!!!!!!!!!");
+    }
+
+	private void GoBackSelectItemOrExitGame()	
+	{
+		Scene UpMenuScene = SceneManager.GetSceneByPath(pathUpMenuScene);
+		 
+		Log.d (LOG_TAG, "Goto Back -- SelectTestItem!!,UpMenuScene="+UpMenuScene);
+		onUninit();
+		if(null != UpMenuScene)
+		{
+		SceneManager.LoadScene(pathUpMenuScene); //,LoadSceneMode.Single);
+//		SceneManager.LoadScene(0); //,LoadSceneMode.Single);
+		}else{
+			Log.d (LOG_TAG, "ExitGame!!");
+			Application.Quit();
+		}
+	}
+
+	private void DumpQuatertion(Quaternion InQuaternion)
+	{
+		Log.d (LOG_TAG,"DumpQuatertion:: Rotation={"+InQuaternion.w+","+InQuaternion.x+","+InQuaternion.y+","+InQuaternion.z+"}"+
+		".<end>");		
+	}
+
+	private void DumpRigidTransform(WaveVR_Utils.RigidTransform InRtPose)
+	{
+		Vector3 Position;
+		Quaternion Rotation;
+		
+		if(null == InRtPose) return;
+		 
+		 Position = InRtPose.pos;
+		 Rotation = InRtPose.rot;	
+
+		Log.d (LOG_TAG,"RigidTransform:: Position={"+Position.x+","+Position.y+","+Position.z+"}"+ 
+		",Rotation={"+Rotation.x+","+Rotation.y+","+Rotation.z+","+Rotation.w+"}"+
+		".<end>");
+	
+//		Log.d (LOG_TAG,"Position="+Position+ 
+//		",Rotation="+Rotation+
+//		".<end>");
+	}
+
+
+   private void DumpPoseState(WVR_PoseState_t tPoseState)
+   {
+//	   if(tPoseState == null || !tPoseState.IsValidPose ) return;
+	   
+	   bool tIsValidPose =  tPoseState.IsValidPose;
+	   WVR_Matrix4f_t tPoseMatrix = tPoseState.PoseMatrix;
+	   WVR_Vector3f_t tVelocity =  tPoseState.Velocity;
+	   WVR_Vector3f_t tAngV =  tPoseState.AngularVelocity;
+	   bool tIs6DoFPose =  tPoseState.Is6DoFPose;
+	   long tStamp_ns =  tPoseState.PoseTimestamp_ns;
+	   WVR_Vector3f_t tAcceleration =  tPoseState.Acceleration;
+	   WVR_Vector3f_t tAngAcc =  tPoseState.AngularAcceleration;
+	   float tPredictedMilliSec =  tPoseState.PredictedMilliSec;
+	   WVR_PoseOriginModel tOriginModel =  tPoseState.OriginModel;
+	   WVR_Pose_t tRawPose =  tPoseState.RawPose;
+	   WVR_Vector3f_t tPosition =  tRawPose.position;
+	   WVR_Quatf_t tRotation =  tRawPose.rotation;
+
+
+       Log.d (LOG_TAG,"PoseState:: IsValidPose="+tIsValidPose+ 
+	          	",Stamp_ns="+tStamp_ns+ 
+			    ",RawPose.Postion(x,y,z)="+tPosition.v0+","+tPosition.v1+","+tPosition.v2 + 
+			    ",RawPose.Rotation(w,x,y,z)="+tRotation.w+","+tRotation.x+","+tRotation.y+","+tRotation.z+ 
+ 			    ",Velocity(x,y,z)="+tVelocity.v0+","+tVelocity.v1+","+tVelocity.v2 + 
+                ",AngularVelocity(x,y,z)="+tAngV.v0+","+tAngV.v1+","+tAngV.v2 + 
+				",Acc(x,y,z)="+tAcceleration.v0+","+tAcceleration.v1+","+tAcceleration.v2 + 
+                ",AngAcc(x,y,z)="+tAngAcc.v0+","+tAngAcc.v1+","+tAngAcc.v2 + 
+			    ",OriginModel="+tOriginModel + 
+			    ",PredictedMilliSec="+tPredictedMilliSec + 
+			    ",PoseMatrix(4X1)="+tPoseMatrix.m0+","+tPoseMatrix.m1+","+tPoseMatrix.m2+","+tPoseMatrix.m3 + 
+				",PoseMatrix(4X2)="+tPoseMatrix.m4+","+tPoseMatrix.m5+","+tPoseMatrix.m6+","+tPoseMatrix.m7 + 
+			    ",PoseMatrix(4X3)="+tPoseMatrix.m8+","+tPoseMatrix.m9+","+tPoseMatrix.m10+","+tPoseMatrix.m11 + 
+                ",PoseMatrix(4X4)="+tPoseMatrix.m12+","+tPoseMatrix.m13+","+tPoseMatrix.m14+","+tPoseMatrix.m15+
+                ".<end>");	   
+   }
+
+   private void DumpDevicePosePair(WVR_DevicePosePair_t InPairPose)
+   {
+//       if(InPairPose == null) return;
+	  	
+   	   WVR_PoseState_t tPoseState = InPairPose.pose;
+	   
+	   bool tIsValidPose =  tPoseState.IsValidPose;
+	   WVR_Matrix4f_t tPoseMatrix = tPoseState.PoseMatrix;
+	   WVR_Vector3f_t tVelocity =  tPoseState.Velocity;
+	   WVR_Vector3f_t tAngV =  tPoseState.AngularVelocity;
+	   bool tIs6DoFPose =  tPoseState.Is6DoFPose;
+	   long tStamp_ns =  tPoseState.PoseTimestamp_ns;
+	   WVR_Vector3f_t tAcceleration =  tPoseState.Acceleration;
+	   WVR_Vector3f_t tAngAcc =  tPoseState.AngularAcceleration;
+	   float tPredictedMilliSec =  tPoseState.PredictedMilliSec;
+	   WVR_PoseOriginModel tOriginModel =  tPoseState.OriginModel;
+	   WVR_Pose_t tRawPose =  tPoseState.RawPose;
+
+	   WVR_Vector3f_t tPosition =  tRawPose.position;
+	   WVR_Quatf_t tRotation =  tRawPose.rotation;
+
+       Log.d (LOG_TAG,"DevicePosePair:: type="+InPairPose.type+ 
+	          	",IsValidPose="+tIsValidPose+ 
+	          	",Stamp_ns="+tStamp_ns+ 
+			    ",RawPose.Postion(x,y,z)="+tPosition.v0+","+tPosition.v1+","+tPosition.v2 + 
+			    ",RawPose.Rotation(w,x,y,z)="+tRotation.w+","+tRotation.x+","+tRotation.y+","+tRotation.z+ 
+ 			    ",Velocity(x,y,z)="+tVelocity.v0+","+tVelocity.v1+","+tVelocity.v2 + 
+                ",AngularVelocity(x,y,z)="+tAngV.v0+","+tAngV.v1+","+tAngV.v2 + 
+				",Acc(x,y,z)="+tAcceleration.v0+","+tAcceleration.v1+","+tAcceleration.v2 + 
+                ",AngAcc(x,y,z)="+tAngAcc.v0+","+tAngAcc.v1+","+tAngAcc.v2 + 
+			    ",OriginModel="+tOriginModel + 
+			    ",PredictedMilliSec="+tPredictedMilliSec + 
+			    ",PoseMatrix(4X1)="+tPoseMatrix.m0+","+tPoseMatrix.m1+","+tPoseMatrix.m2+","+tPoseMatrix.m3 + 
+				",PoseMatrix(4X2)="+tPoseMatrix.m4+","+tPoseMatrix.m5+","+tPoseMatrix.m6+","+tPoseMatrix.m7 + 
+			    ",PoseMatrix(4X3)="+tPoseMatrix.m8+","+tPoseMatrix.m9+","+tPoseMatrix.m10+","+tPoseMatrix.m11 + 
+                ",PoseMatrix(4X4)="+tPoseMatrix.m12+","+tPoseMatrix.m13+","+tPoseMatrix.m14+","+tPoseMatrix.m15+
+                ".<end>");
+   	}
+	
+	private void DumpWVR_Matrix4f(WVR_Matrix4f_t tPoseMatrix)
+	{
+       Log.d (LOG_TAG,"WVR_Matrix4f="+
+			    "(4X1)={"+tPoseMatrix.m0+","+tPoseMatrix.m1+","+tPoseMatrix.m2+","+tPoseMatrix.m3 + "}"+
+				"(4X2)={"+tPoseMatrix.m4+","+tPoseMatrix.m5+","+tPoseMatrix.m6+","+tPoseMatrix.m7 +  "}"+
+			    "(4X3)={"+tPoseMatrix.m8+","+tPoseMatrix.m9+","+tPoseMatrix.m10+","+tPoseMatrix.m11 +  "}"+
+                "(4X4)={"+tPoseMatrix.m12+","+tPoseMatrix.m13+","+tPoseMatrix.m14+","+tPoseMatrix.m15+ "}"+
+                ".<end>");
+	}
+
+/*--------------------------------------------Matrix3.java----------------------------------------------------------
+public class Matrix3 {
+    private static final float EPSILON = 0.00001f;
+    private float m[] = new float[9];
+
+    public Matrix3() {
+        identity();
+    }
+
+    public Matrix3(
+            float m0, float m1, float m2,
+            float m3, float m4, float m5,
+            float m6, float m7, float m8) {
+        set(m0, m1, m2,  m3, m4, m5,  m6, m7, m8);
+    }
+
+    public Matrix3 identity() {
+        m[0] = m[4] = m[8] = 1.0f;
+        m[1] = m[2] = m[3] = m[5] = m[6] = m[7] = 0.0f;
+        return this;
+    }
+
+    public void set(
+            float m0, float m1, float m2,
+            float m3, float m4, float m5,
+            float m6, float m7, float m8) {
+        m[0] = m0;  m[1] = m1;  m[2] = m2;
+        m[3] = m3;  m[4] = m4;  m[5] = m5;
+        m[6] = m6;  m[7] = m7;  m[8] = m8;
+    }
+
+    public float [] get() {
+        return m;
+    }
+
+    // Mout = rhs * this
+    public Matrix3 multiply(Matrix3 _rhs) {
+        final float [] rhs = _rhs.get();
+        return new Matrix3(
+            m[0]*rhs[0] + m[3]*rhs[1] + m[6]*rhs[2],  m[1]*rhs[0] + m[4]*rhs[1] + m[7]*rhs[2],  m[2]*rhs[0] + m[5]*rhs[1] + m[8]*rhs[2],
+            m[0]*rhs[3] + m[3]*rhs[4] + m[6]*rhs[5],  m[1]*rhs[3] + m[4]*rhs[4] + m[7]*rhs[5],  m[2]*rhs[3] + m[5]*rhs[4] + m[8]*rhs[5],
+            m[0]*rhs[6] + m[3]*rhs[7] + m[6]*rhs[8],  m[1]*rhs[6] + m[4]*rhs[7] + m[7]*rhs[8],  m[2]*rhs[6] + m[5]*rhs[7] + m[8]*rhs[8]);
+    }
+
+    public Matrix3 transpose() {
+        float tmp;
+        tmp = m[1];
+        m[1] = m[3];
+        m[3] = tmp;
+
+        tmp = m[2];
+        m[2] = m[6];
+        m[6] = tmp;
+
+        tmp = m[5];
+        m[5] = m[7];
+        m[7] = tmp;
+
+        return this;
+    }
+
+    public Matrix3 invert() {
+        float determinant, invDeterminant;
+        float tmp [] = new float [9];
+
+        tmp[0] = m[4] * m[8] - m[5] * m[7];
+        tmp[1] = m[2] * m[7] - m[1] * m[8];
+        tmp[2] = m[1] * m[5] - m[2] * m[4];
+        tmp[3] = m[5] * m[6] - m[3] * m[8];
+        tmp[4] = m[0] * m[8] - m[2] * m[6];
+        tmp[5] = m[2] * m[3] - m[0] * m[5];
+        tmp[6] = m[3] * m[7] - m[4] * m[6];
+        tmp[7] = m[1] * m[6] - m[0] * m[7];
+        tmp[8] = m[0] * m[4] - m[1] * m[3];
+
+        // check determinant if it is 0
+        determinant = m[0] * tmp[0] + m[1] * tmp[3] + m[2] * tmp[6];
+        if(Math.abs(determinant) <= EPSILON)
+            return identity(); // cannot inverse, make it idenety matrix
+
+        // divide by the determinant
+        invDeterminant = 1.0f / determinant;
+        m[0] = invDeterminant * tmp[0];
+        m[1] = invDeterminant * tmp[1];
+        m[2] = invDeterminant * tmp[2];
+        m[3] = invDeterminant * tmp[3];
+        m[4] = invDeterminant * tmp[4];
+        m[5] = invDeterminant * tmp[5];
+        m[6] = invDeterminant * tmp[6];
+        m[7] = invDeterminant * tmp[7];
+        m[8] = invDeterminant * tmp[8];
+
+        return this;
+    }
+
+    @Override
+    public String toString() {
+        return String.format(Locale.US,
+                "|%+f %+f %+f|\n" +
+                "|%+f %+f %+f|\n" +
+                "|%+f %+f %+f|...math form",
+                m[0],  m[3], m[6],
+                m[1],  m[4], m[7],
+                m[2],  m[5], m[8]
+        );
+    }
+
+    public Matrix3 log(String name) {
+        Log.d(name, toString());
+        return this;
+    }
+}
+-----------------------------------------------------------------------------------------------------------*/
+}

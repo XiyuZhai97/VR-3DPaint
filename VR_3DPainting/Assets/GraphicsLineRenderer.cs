@@ -1,10 +1,4 @@
-﻿/*Unity 3D Codes for "Building Tilt Brush from Scratch" YouTube tutorial by Fuseman
-https://www.youtube.com/watch?v=eMJATZI0A7c
-He also uses code from Bartek Drozdz so I feel I should mention that (as I don't know who did what, I just transcribed the code!)
-http://www.everyday3d.com/blog/index.php/2010/03/15/3-ways-to-draw-3d-lines-in-unity3d/
-*/
-
-using UnityEngine;
+﻿using UnityEngine;
 using System.Collections.Generic;
 
 /*
