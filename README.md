@@ -27,3 +27,17 @@ This is a sample Scene build from [Hello VR](https://hub.vive.com/storage/app/do
 
 Simply Build and Run after connecting Focus to Mac
 
+### Draw Line
+
+#### DrawLineManager
+Capture the button
+        public bool isControllerFocus_R;
+
+#### Capture Button Events
+    WaveVR_Controller.EDeviceType curFocusControllerType = WaveVR_Controller.EDeviceType.Head;
+    WaveVR_Controller.EDeviceType DomFocusControllerType = WaveVR_Controller.EDeviceType.Dominant;
+~//WaveVR_Controller.Device Dom = WaveVR_Controller.Input(WaveVR_Controller.EDeviceType.Dominant);~
+
+    WaveVR_Controller.EDeviceType NonFocusControllerType = WaveVR_Controller.EDeviceType.NonDominant;
+
+#### Line Render
