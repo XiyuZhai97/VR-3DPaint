@@ -2,7 +2,6 @@
 ## Xiyu Zhai, Aakash Parikh, Melody Mao
 This project aims to creat a VR-based tilt brush app that allows people to draw strokes in 3D.
 on a HTC Vive Focus Plus
-## Part one Hello Focus -- Xiyu Zhai
 HTC Vive Focus Plus runs an Android system, thus if you want it to run PC VR, use VRidge
 
 ## Vive to Wave VR 
@@ -41,12 +40,22 @@ Be able to draw continuous strokes in 3D using a handheld controller
         currLine.SetWidth(.05f, .01f);
         currLine.material = lMat;
 2. Pressing: Add points of the LineRender
+
         currLine.SetVertexCount(numClicks + 1);
         currLine.SetPosition(numClicks, WaveVR_Controller.Input(DomFocusControllerType).transform.pos);
 ### Using Graphics Line Renderer
 Follow [this blog](http://www.everyday3d.com/blog/index.php/2010/03/15/3-ways-to-draw-3d-lines-in-unity3d/) to use a "better" line renderer that generate lines which won't change when camera moving
-## Menu
-Change stroke size and color - how you implement this menu functionality is up to you
+## Color Picker
+Change stroke's color
+Using Package Simple Color Picker
+1. Rewrite Draggable.cs in Color Picker-Script for the VR controller instead of mouse
+2. Add ColorManager.cs to 
+3. Rewrite DrawLineManager.cs to get color
+
+        currLine.lmat = new Material(lMat); //create new material every time
+        currLine.lmat.color = ColorManager.Instance.GetCurrentColor();
+
+## Stroke Size 
 ## Navigation:
 * Scale, rotate, and move your sketch (or your position within the sketch).
 * Teleport to different locations within the sketch.
