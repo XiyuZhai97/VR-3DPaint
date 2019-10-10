@@ -6,7 +6,7 @@ on a HTC Vive Focus Plus
 HTC Vive Focus Plus runs an Android system, if you want it to run PC VR, use VRidge
 
 ---
-## Vive to Wave VR 
+## Vive to Wave VR
 Before we start, there is actually a [tutorial](https://hub.vive.com/storage/app/doc/en-us/ViveToWaveVR.html#vivetowavevr) talks about how to port an app from Vive(Using Steam VR) to Wave VR.
 
 And there is a excellent [tutorial](https://www.youtube.com/watch?v=eMJATZI0A7c) teaches how to build tilt brush from scratch.
@@ -75,8 +75,8 @@ Using Package Simple Color Picker
 currLine.lmat = new Material(lMat); //create new material every time
 currLine.lmat.color = ColorManager.Instance.GetCurrentColor();
 ```
-## Stroke Size 
-Follow [this doc](https://hub.vive.com/storage/app/doc/en-us/WaveVR_SystemEvent.html) to use Swipe Event on both controller to change stroke size. 
+## Stroke Size
+Follow [this doc](https://hub.vive.com/storage/app/doc/en-us/WaveVR_SystemEvent.html) to use Swipe Event on both controller to change stroke size.
 ```cs
 void OnEvent(params object[] args){}
 ...
@@ -96,8 +96,7 @@ Use Nondominant controller to point the test sphere and Press Touchpad will rese
 SceneManager.LoadScene(SceneName);
 ```
 ### **Erase individual  brush strokes**
-
+You can undo the last brush stroke by swiping from Right to Left on the controller
 ## Navigation:
 * Scale, rotate, and move your sketch (or your position within the sketch).
 * Teleport to different locations within the sketch.
-
