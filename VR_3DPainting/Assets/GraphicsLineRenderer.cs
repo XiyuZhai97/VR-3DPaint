@@ -34,6 +34,11 @@ public class GraphicsLineRenderer : MonoBehaviour
         lineSize = width;
     }
 
+    public void ClearLine()
+    {
+        ml.Clear();
+    }
+
     public void AddPoint(Vector3 point)
     {
         if (s != Vector3.zero)
