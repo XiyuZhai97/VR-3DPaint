@@ -14,6 +14,7 @@ public class DrawLineManager : MonoBehaviour
     private WaveVR_PermissionManager pmInstance = null;
 
     private GraphicsLineRenderer currLine;
+    private List<GraphicsLineRenderer> pastLines = new List<GraphicsLineRenderer>();
     private int numClicks;
     public GameObject trackedObj;
     public Material lMat;
@@ -48,6 +49,7 @@ public class DrawLineManager : MonoBehaviour
         }
         else if (WaveVR_Controller.Input(DomFocusControllerType).GetPressUp(WVR_InputId.WVR_InputId_Alias1_Trigger))
         {
+            pastLines.Add(currLine);
             numClicks = 0;
         }
         if (currLine != null)
@@ -64,10 +66,13 @@ public class DrawLineManager : MonoBehaviour
         {
             case WVR_EventType.WVR_EventType_RightToLeftSwipe:
                 //transform.Rotate(0, 180 * (10 * Time.deltaTime), 0);
-                if (currLine != null)
+                int len = pastLines.Count;
+                if (len > 0)
                 {
-                    currLine.ClearLine();
-                    currLine = null;
+                    GraphicsLineRenderer toRemove = pastLines[len - 1];
+                    toRemove.ClearLine();
+                    toRemove = null;
+                    pastLines.RemoveAt(len-1);
                 }
                 break;
             case WVR_EventType.WVR_EventType_DownToUpSwipe:
