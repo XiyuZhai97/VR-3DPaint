@@ -20,6 +20,7 @@ public class DrawLineManager : MonoBehaviour
     public Material lMat;
     float width = .1f;
 
+    private float prevYAngle; //keeps track of controller angle while rotating sketch
 
     void Start()
     {
@@ -29,6 +30,7 @@ public class DrawLineManager : MonoBehaviour
 
     void Update()
     {
+        //generate stroke mesh when dominant hand trigger is down
         if (WaveVR_Controller.Input(DomFocusControllerType).GetPressDown(WVR_InputId.WVR_InputId_Alias1_Trigger))
         {
             GameObject go = new GameObject();
@@ -52,6 +54,39 @@ public class DrawLineManager : MonoBehaviour
             pastLines.Add(currLine);
             numClicks = 0;
         }
+
+        //rotate sketch when dominant hand grip is down
+        if (WaveVR_Controller.Input(DomFocusControllerType).GetPressDown(WVR_InputId.WVR_InputId_Alias1_Touchpad))
+        {
+            //store prev angle
+            WaveVR_Utils.RigidTransform _rpose = WaveVR_Controller.Input(WaveVR_Controller.EDeviceType.Dominant).transform;
+            float prevYAngle = _rpose.rot.eulerAngles[1];
+        }
+        else if (WaveVR_Controller.Input(DomFocusControllerType).GetPress(WVR_InputId.WVR_InputId_Alias1_Touchpad))
+        {
+            WaveVR_Utils.RigidTransform _rpose = WaveVR_Controller.Input(WaveVR_Controller.EDeviceType.Dominant).transform;
+            float yAngle = _rpose.rot.eulerAngles[1];
+            float dyAngle = yAngle - prevYAngle;
+            
+            //rotate sketch based on change from previous angle
+            Vector3 center = new Vector3(0, 0, 0);//any V3 you want as the pivot point.
+            Quaternion newRotation = new Quaternion();
+            newRotation.eulerAngles = new Vector3(0,dyAngle,0);//the degrees the vertices are to be rotated, for example (0,90,0)
+
+            //rotate each stroke (GraphicsLineRenderer) by rotating its mesh vertices
+            foreach (GraphicsLineRenderer glr in pastLines)
+            {
+                Vector3[] vertices = glr.ml.vertices;
+                for(int v = 0; v < vertices.Length; v++) {//vertices being the array of vertices of your mesh
+                    vertices[v] = newRotation * (vertices[v] - center) + center;
+                }
+                glr.ml.vertices = vertices;
+            }
+
+            prevYAngle = yAngle;
+        }
+
+        //give current stroke color from color picker
         if (currLine != null)
         {
             currLine.lmat.color = ColorManager.Instance.GetCurrentColor();
@@ -80,7 +115,7 @@ public class DrawLineManager : MonoBehaviour
                 //transform.Rotate(0, 0, 180 * (10 * Time.deltaTime));
                 break;
             case WVR_EventType.WVR_EventType_UpToDownSwipe:
-                width -= 0.02f;
+                width -= 0.02f; ///TODO: shouldn't this have a check to make sure it doesn't become 0?
                 //transform.Rotate(0, 0, -180 * (10 * Time.deltaTime));
                 break;
         }

@@ -165,7 +165,7 @@ IPointerHoverHandler
 
     public static void requestUsbDoneCallback(bool result)
     {
-#if !UINTY_EDITOR
+#if !UNITY_EDITOR
         //Log.d(LOG_TAG, "requestUsbDoneCallback, result= " + result);
 #endif
     }

@@ -34,3 +34,7 @@ sysinfo.txt
 # Builds
 *.apk
 *.unitypackage
+
+VR_3DPainting/Assets/TempNav.cs
+VR_3DPainting/Assets/TempNav.cs.meta
+Testing WaveVR setup/

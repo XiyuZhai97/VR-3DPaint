@@ -44,6 +44,7 @@ GameObject:
   - component: {fileID: 36}
   - component: {fileID: 44}
   - component: {fileID: 42}
+  - component: {fileID: 22}
   m_Layer: 0
   m_Name: Floor
   m_TagString: Untagged
@@ -51,6 +52,23 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
+--- !u!114 &22
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 21}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ecc71e3e746ef448fa010d2328519ec3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  isControllerFocus_R: 0
+  isControllerFocus_L: 0
+  m_RightController: {fileID: 841068237}
+  m_LeftController: {fileID: 1680517929}
+  teleportSprite: {fileID: 1483275416}
 --- !u!4 &23
 Transform:
   m_ObjectHideFlags: 0
@@ -200,7 +218,7 @@ RenderSettings:
   m_ReflectionIntensity: 1
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 0}
-  m_IndirectSpecularColor: {r: 0.37311947, g: 0.38074005, b: 0.35872722, a: 1}
+  m_IndirectSpecularColor: {r: 0.3731193, g: 0.38073996, b: 0.3587269, a: 1}
   m_UseRadianceAmbientProbe: 0
 --- !u!135 &52
 SphereCollider:
@@ -660,6 +678,12 @@ PrefabInstance:
       objectReference: {fileID: 0}
     m_RemovedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 4a42178e8da825e4da4903845589ff5f, type: 3}
+--- !u!1 &841068237 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 1962041164266716, guid: c6c23447d97cdec47ae26a8552bf2607,
+    type: 3}
+  m_PrefabInstance: {fileID: 985885488}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1001 &907618243
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -1032,6 +1056,83 @@ Transform:
     type: 3}
   m_PrefabInstance: {fileID: 985885488}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &1483275416
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1483275419}
+  - component: {fileID: 1483275418}
+  - component: {fileID: 1483275417}
+  m_Layer: 0
+  m_Name: TeleportSprite
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!23 &1483275417
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1483275416}
+  m_Enabled: 1
+  m_CastShadows: 1
+  m_ReceiveShadows: 1
+  m_DynamicOccludee: 1
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: ab9b623df3767475db243412fecb7949, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 0
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+--- !u!33 &1483275418
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1483275416}
+  m_Mesh: {fileID: 10207, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!4 &1483275419
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1483275416}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 0.15, y: 0.15, z: 0.15}
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_RootOrder: 8
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1537105567
 GameObject:
   m_ObjectHideFlags: 0
@@ -1083,6 +1184,12 @@ MonoBehaviour:
   inverseRotation: 0
   trackRotation: 1
   timing: 1
+--- !u!1 &1680517929 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 1962041164266716, guid: c6c23447d97cdec47ae26a8552bf2607,
+    type: 3}
+  m_PrefabInstance: {fileID: 907618243}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &1839194418
 GameObject:
   m_ObjectHideFlags: 0

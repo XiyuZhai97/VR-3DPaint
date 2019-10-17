@@ -15,7 +15,7 @@ public class GraphicsLineRenderer : MonoBehaviour
 
     public Material lmat;
 
-    private Mesh ml;
+    public Mesh ml;
 
     private Vector3 s;
 
@@ -128,7 +128,7 @@ public class GraphicsLineRenderer : MonoBehaviour
         int tl = m.triangles.Length;
 
         int[] ts = m.triangles;
-        ts = resizeTraingles(ts, 12); //!misspelling of triangles !!!
+        ts = resizeTraingles(ts, 12); //TODO: !misspelling of triangles !!!
 
         if (quad.Length == 2)
             vl -= 4;
@@ -174,7 +174,7 @@ public class GraphicsLineRenderer : MonoBehaviour
     }
 
     int[] resizeTraingles(int[] ovs, int ns)
-    { //!!Misspelled triangles !!!
+    { //TODO: !!Misspelled triangles !!!
         int[] nvs = new int[ovs.Length + ns];
         for (int i = 0; i < ovs.Length; i++) nvs[i] = ovs[i];
         return nvs;
