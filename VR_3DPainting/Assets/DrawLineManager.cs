@@ -23,6 +23,8 @@ public class DrawLineManager : MonoBehaviour
     private float prevYAngle; //keeps track of controller angle while rotating sketch
     private float prevDist; //keeps track of distance btw controllers while scaling sketch
 
+    public Navigator nav; //access navigator to check whether in teleport mode
+
     void Start()
     {
         trackedObj.GetComponent<MeshRenderer>().material.SetColor("_Color", Color.red);

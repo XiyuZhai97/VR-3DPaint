@@ -45,9 +45,10 @@ GameObject:
   - component: {fileID: 44}
   - component: {fileID: 42}
   - component: {fileID: 22}
+  - component: {fileID: 24}
   m_Layer: 0
   m_Name: Floor
-  m_TagString: Untagged
+  m_TagString: floor
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -64,11 +65,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ecc71e3e746ef448fa010d2328519ec3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  isControllerFocus_R: 0
-  isControllerFocus_L: 0
-  m_RightController: {fileID: 841068237}
-  m_LeftController: {fileID: 1680517929}
   teleportSprite: {fileID: 1483275416}
+  teleportOn: 0
 --- !u!4 &23
 Transform:
   m_ObjectHideFlags: 0
@@ -77,12 +75,25 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1328440791}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -2.88, y: -0.35, z: 3.05}
+  m_LocalPosition: {x: -3.77, y: 1.48, z: 3.05}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 1039849161}
   m_RootOrder: 4
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &24
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 21}
+  m_Material: {fileID: 0}
+  m_IsTrigger: 0
+  m_Enabled: 1
+  serializedVersion: 2
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!4 &36
 Transform:
   m_ObjectHideFlags: 0
@@ -678,12 +689,6 @@ PrefabInstance:
       objectReference: {fileID: 0}
     m_RemovedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 4a42178e8da825e4da4903845589ff5f, type: 3}
---- !u!1 &841068237 stripped
-GameObject:
-  m_CorrespondingSourceObject: {fileID: 1962041164266716, guid: c6c23447d97cdec47ae26a8552bf2607,
-    type: 3}
-  m_PrefabInstance: {fileID: 985885488}
-  m_PrefabAsset: {fileID: 0}
 --- !u!1001 &907618243
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -1184,12 +1189,6 @@ MonoBehaviour:
   inverseRotation: 0
   trackRotation: 1
   timing: 1
---- !u!1 &1680517929 stripped
-GameObject:
-  m_CorrespondingSourceObject: {fileID: 1962041164266716, guid: c6c23447d97cdec47ae26a8552bf2607,
-    type: 3}
-  m_PrefabInstance: {fileID: 907618243}
-  m_PrefabAsset: {fileID: 0}
 --- !u!1 &1839194418
 GameObject:
   m_ObjectHideFlags: 0
@@ -1252,6 +1251,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   trackedObj: {fileID: 1328440791}
   lMat: {fileID: 2100000, guid: d36e2ae9bb4a8304cb4b11e1d60b7716, type: 2}
+  nav: {fileID: 22}
 --- !u!4 &2062173764
 Transform:
   m_ObjectHideFlags: 0
