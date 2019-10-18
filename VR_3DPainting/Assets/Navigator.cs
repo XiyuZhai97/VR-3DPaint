@@ -14,34 +14,42 @@ public class Navigator : MonoBehaviour
     public GameObject teleportSprite; //indicator of where you'll teleport to
     public bool teleportOn = false;
     private bool hasPosition = false;
+    private bool firstClick;
+    private float firstClickTime;
+    private float doubleClickTimeLimit = 0.5f;
 
     void Update()
     {
-        // if (teleportOn)
-        // {
-        //     //grip release, try to teleport
-        //     if (WaveVR_Controller.Input(DomFocusControllerType).GetPressUp(WVR_InputId.WVR_InputId_Alias1_Grip))
-        //     {
-        //         teleportOn = false;
-        //         hasPosition = false;
-        //     }
-        //     else //otherwise update sprite
-        //     {
-                hasPosition = UpdateSprite();
-                teleportSprite.SetActive(true);
-        //         teleportSprite.SetActive(hasPosition); //only visible if we can teleport there
-        //     }
-        // }
-        //to turn on teleport, check for just right grip down
-        // else if (WaveVR_Controller.Input(DomFocusControllerType).GetPressDown(WVR_InputId.WVR_InputId_Alias1_Grip))
-        //     //&& !WaveVR_Controller.Input(NonFocusControllerType).GetPress(WVR_InputId.WVR_InputId_Alias1_Grip))
-        // {
-        //     teleportOn = true;
-        // }
-        //teleport on, ignore left grip
-        //send out pointer
-        //put teleport sprite at end of it
-        //when teleport on, if grip released, teleport
+        if (teleportOn)
+        {
+            hasPosition = UpdateSprite();
+            teleportSprite.SetActive(hasPosition); //only visible if we can teleport there
+            
+            //trigger down, teleport if possible
+            if (hasPosition && WaveVR_Controller.Input(DomFocusControllerType).GetPressDown(WVR_InputId.WVR_InputId_Alias1_Trigger))
+            {
+                Vector3 teleportPos = teleportSprite.transform.position;
+                Vector3 oldPos = this.gameObject.transform.position;
+                this.gameObject.transform.position = new Vector3(teleportPos.x, oldPos.y, teleportPos.z);
+
+                ToggleTeleportMode();
+            }
+        }
+        
+        //double click to toggle teleport mode
+        if (WaveVR_Controller.Input(DomFocusControllerType).GetPressDown(WVR_InputId.WVR_InputId_Alias1_Trigger)) { // The trigger is pressed.
+            if (!firstClick) { // The first click is detected.
+                firstClick = true;
+                firstClickTime = Time.unscaledTime;
+            } else { // The second click detected, so toggle teleport mode.
+                firstClick = false;
+                ToggleTeleportMode();
+            }
+        }
+
+        if (Time.unscaledTime - firstClickTime > doubleClickTimeLimit) { // Time for the double click has run out.
+            firstClick = false;
+        }
     }
 
     /* moves the teleport sprite to the teleport position, if possible
@@ -67,5 +75,13 @@ public class Navigator : MonoBehaviour
         
         //no hit
         return false;
+    }
+
+    void ToggleTeleportMode() {
+        teleportOn = !teleportOn;
+        if (!teleportOn) {
+            hasPosition = false;
+            teleportSprite.SetActive(false);
+        }
     }
 }

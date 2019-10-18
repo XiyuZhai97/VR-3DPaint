@@ -34,28 +34,31 @@ public class DrawLineManager : MonoBehaviour
     void Update()
     {
         //generate stroke mesh when dominant hand trigger is down
-        if (WaveVR_Controller.Input(DomFocusControllerType).GetPressDown(WVR_InputId.WVR_InputId_Alias1_Trigger))
+        if (!nav.teleportOn) //only draw if not in teleport mode
         {
-            GameObject go = new GameObject();
-            go.AddComponent<MeshFilter>();
-            go.AddComponent<MeshRenderer>();
-            currLine = go.AddComponent<GraphicsLineRenderer>();
+            if (WaveVR_Controller.Input(DomFocusControllerType).GetPressDown(WVR_InputId.WVR_InputId_Alias1_Trigger))
+            {
+                GameObject go = new GameObject();
+                go.AddComponent<MeshFilter>();
+                go.AddComponent<MeshRenderer>();
+                currLine = go.AddComponent<GraphicsLineRenderer>();
 
-            currLine.lmat = new Material(lMat);
-            //currLine.lmat = lMat;
-            currLine.SetWidth(width);
+                currLine.lmat = new Material(lMat);
+                //currLine.lmat = lMat;
+                currLine.SetWidth(width);
 
-            numClicks = 0;
-        }
-        else if (WaveVR_Controller.Input(DomFocusControllerType).GetPress(WVR_InputId.WVR_InputId_Alias1_Trigger))
-        {
-            currLine.AddPoint(WaveVR_Controller.Input(DomFocusControllerType).transform.pos);
-            numClicks++;
-        }
-        else if (WaveVR_Controller.Input(DomFocusControllerType).GetPressUp(WVR_InputId.WVR_InputId_Alias1_Trigger))
-        {
-            pastLines.Add(currLine);
-            numClicks = 0;
+                numClicks = 0;
+            }
+            else if (WaveVR_Controller.Input(DomFocusControllerType).GetPress(WVR_InputId.WVR_InputId_Alias1_Trigger))
+            {
+                currLine.AddPoint(WaveVR_Controller.Input(DomFocusControllerType).transform.pos);
+                numClicks++;
+            }
+            else if (WaveVR_Controller.Input(DomFocusControllerType).GetPressUp(WVR_InputId.WVR_InputId_Alias1_Trigger))
+            {
+                pastLines.Add(currLine);
+                numClicks = 0;
+            }
         }
 
         //scale sketch when both grips are down

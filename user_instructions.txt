@@ -3,33 +3,14 @@ right controller
 - swipe right-to-left to undo 1 stroke
 - swipe down-to-up to increase stroke size
 - swipe up-to-down to decrease stroke size
-- hold down touchpad and drag side-to-side to rotate sketch
+- hold down grip and drag side-to-side to rotate sketch
+- double-click touchpad to toggle teleportation mode
+- in teleportation mode, click trigger to teleport to teleport sprite
 
 left controller
 - click trigger to select color by saturation/value
 - click/drag on hue bar w/ trigger held down to change hue
-- point at sphere on lower left (it should turn blue) and click trackpad
+- point at sphere on lower left (it should turn blue) and click trackpad to reset
 
-
------ planning notes -----
-
-teleportation
-- toggle teleportation mode by double-clicking trigger? or hold down grip,
-    to avoid having it conflict with drawing
-- detect when pointer intersects floor
-- put a teleport sprite (maybe a sphere) at that intersection
-- get those coordinates and set head transform to go there
-- so would this be attached to head or to floor? it needs to move the head,
-    but it needs to intersect the floor
-- move color picker with you somehow
-
-scale
-- get the positions of the controllers and calc
-    whether they're moving closer (smaller dist) or farther apart (bigger dist)
-    - specifically when the vector btw them stays at relatively the same angle?
-- and then when the vector btw them changes angle, you get that change and apply it
-    to the sketch too
-- I would imagine teleporting to be w/ the left hand, when you're not pointing at the color picker?
-
-- I think maybe the stroke size change should be more drastic
-- stroke width could change by clicking the upper/lower parts of the touch pad instead of swiping?
+both controllers
+- hold both controller grips and move hands apart/together to scale sketch
