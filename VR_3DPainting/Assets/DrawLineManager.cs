@@ -21,6 +21,7 @@ public class DrawLineManager : MonoBehaviour
     float width = .1f;
 
     private float prevYAngle; //keeps track of controller angle while rotating sketch
+    private float prevDist; //keeps track of distance btw controllers while scaling sketch
 
     void Start()
     {
@@ -55,14 +56,68 @@ public class DrawLineManager : MonoBehaviour
             numClicks = 0;
         }
 
+        //scale sketch when both grips are down
+        if (WaveVR_Controller.Input(DomFocusControllerType).GetPressDown(WVR_InputId.WVR_InputId_Alias1_Grip)
+            && WaveVR_Controller.Input(NonFocusControllerType).GetPressDown(WVR_InputId.WVR_InputId_Alias1_Grip))
+        {
+            WaveVR_Utils.RigidTransform _rpose = WaveVR_Controller.Input(DomFocusControllerType).transform;
+            Vector3 posR = _rpose.pos;
+            WaveVR_Utils.RigidTransform _lpose = WaveVR_Controller.Input(NonFocusControllerType).transform;
+            Vector3 posL = _lpose.pos;
+
+            prevDist = Vector3.Distance(posR, posL);
+        }
+        else if (WaveVR_Controller.Input(DomFocusControllerType).GetPress(WVR_InputId.WVR_InputId_Alias1_Grip)
+            && WaveVR_Controller.Input(NonFocusControllerType).GetPress(WVR_InputId.WVR_InputId_Alias1_Grip))
+        {
+            WaveVR_Utils.RigidTransform _rpose = WaveVR_Controller.Input(DomFocusControllerType).transform;
+            Vector3 posR = _rpose.pos;
+            WaveVR_Utils.RigidTransform _lpose = WaveVR_Controller.Input(NonFocusControllerType).transform;
+            Vector3 posL = _lpose.pos;
+
+            float dist = Vector3.Distance(posR, posL);
+            float dDist = dist - prevDist;
+
+            float scale = 1.05f;
+            if (dDist < 0)
+            {
+                scale = 0.95f;
+            }
+
+            //get sketch center to use later to keep sketch around same position
+            //(otherwise it floats up when it scales up)
+            Vector3 sumVector = Vector3.zero;
+            float count = 0.0f;
+            foreach (GraphicsLineRenderer glr in pastLines)
+            {
+                foreach(Vector3 vec in glr.ml.vertices)
+                {
+                    sumVector += vec;
+                    count++;
+                }
+            }
+            Vector3 avgVector = sumVector / count;
+
+            //scale each stroke (GraphicsLineRenderer) by scaling its mesh vertices
+            foreach (GraphicsLineRenderer glr in pastLines)
+            {
+                Vector3[] vertices = glr.ml.vertices;
+                for(int v = 0; v < vertices.Length; v++) {//vertices being the array of vertices of your mesh
+                    vertices[v] = (vertices[v] - avgVector) * scale + avgVector;
+                }
+                glr.ml.vertices = vertices;
+            }
+
+            prevDist = dist;
+        }
         //rotate sketch when dominant hand grip is down
-        if (WaveVR_Controller.Input(DomFocusControllerType).GetPressDown(WVR_InputId.WVR_InputId_Alias1_Touchpad))
+        else if (WaveVR_Controller.Input(DomFocusControllerType).GetPressDown(WVR_InputId.WVR_InputId_Alias1_Grip))
         {
             //store prev angle
             WaveVR_Utils.RigidTransform _rpose = WaveVR_Controller.Input(WaveVR_Controller.EDeviceType.Dominant).transform;
             float prevYAngle = _rpose.rot.eulerAngles[1];
         }
-        else if (WaveVR_Controller.Input(DomFocusControllerType).GetPress(WVR_InputId.WVR_InputId_Alias1_Touchpad))
+        else if (WaveVR_Controller.Input(DomFocusControllerType).GetPress(WVR_InputId.WVR_InputId_Alias1_Grip))
         {
             WaveVR_Utils.RigidTransform _rpose = WaveVR_Controller.Input(WaveVR_Controller.EDeviceType.Dominant).transform;
             float yAngle = _rpose.rot.eulerAngles[1];
@@ -92,6 +147,7 @@ public class DrawLineManager : MonoBehaviour
             currLine.lmat.color = ColorManager.Instance.GetCurrentColor();
         }
     }
+
     void OnEvent(params object[] args)
     {
         var _event = (WVR_EventType)args[0];
