@@ -1,13 +1,6 @@
 ﻿using UnityEngine;
 using System.Collections.Generic;
 
-/*
-class Point {
-	public Vector3 p;
-	public Point next;
-}
-*/
-
 [RequireComponent(typeof(MeshRenderer))]
 [RequireComponent(typeof(MeshFilter))]
 public class GraphicsLineRenderer : MonoBehaviour
@@ -128,7 +121,7 @@ public class GraphicsLineRenderer : MonoBehaviour
         int tl = m.triangles.Length;
 
         int[] ts = m.triangles;
-        ts = resizeTraingles(ts, 12); //TODO: !misspelling of triangles !!!
+        ts = resizeTraingles(ts, 12);
 
         if (quad.Length == 2)
             vl -= 4;
@@ -174,15 +167,9 @@ public class GraphicsLineRenderer : MonoBehaviour
     }
 
     int[] resizeTraingles(int[] ovs, int ns)
-    { //TODO: !!Misspelled triangles !!!
+    {
         int[] nvs = new int[ovs.Length + ns];
         for (int i = 0; i < ovs.Length; i++) nvs[i] = ovs[i];
         return nvs;
     }
 }
-
-
-
-//Not used in video but was created when new script was created.
-//I do not think you need this. But if so, place a beginning of code. It works without though.
-//using System.Collections;

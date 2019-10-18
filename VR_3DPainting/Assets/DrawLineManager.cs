@@ -44,7 +44,6 @@ public class DrawLineManager : MonoBehaviour
                 currLine = go.AddComponent<GraphicsLineRenderer>();
 
                 currLine.lmat = new Material(lMat);
-                //currLine.lmat = lMat;
                 currLine.SetWidth(width);
 
                 numClicks = 0;
@@ -161,7 +160,6 @@ public class DrawLineManager : MonoBehaviour
         switch (_event)
         {
             case WVR_EventType.WVR_EventType_RightToLeftSwipe:
-                //transform.Rotate(0, 180 * (10 * Time.deltaTime), 0);
                 int len = pastLines.Count;
                 if (len > 0)
                 {
@@ -173,11 +171,9 @@ public class DrawLineManager : MonoBehaviour
                 break;
             case WVR_EventType.WVR_EventType_DownToUpSwipe:
                 width += 0.02f;
-                //transform.Rotate(0, 0, 180 * (10 * Time.deltaTime));
                 break;
             case WVR_EventType.WVR_EventType_UpToDownSwipe:
-                width -= 0.02f; ///TODO: shouldn't this have a check to make sure it doesn't become 0?
-                //transform.Rotate(0, 0, -180 * (10 * Time.deltaTime));
+                width -= 0.02f;
                 break;
         }
     }
