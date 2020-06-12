@@ -1,7 +1,6 @@
 # VR-3DPaint
 ## Xiyu Zhai, Aakash Parikh, Melody Mao
-This project aims to creat a VR-based tilt brush app that allows people to draw strokes in 3D.
-on a HTC Vive Focus Plus
+This project aims to creat a VR-based tilt brush app that allows people to draw strokes in 3D on a HTC Vive Focus Plus. Check out our project on [Youtube](https://youtu.be/oFOSZaEVhPY)!
 
 HTC Vive Focus Plus runs an Android system, if you want it to run PC VR, use VRidge
 
